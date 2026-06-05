@@ -1,17 +1,24 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { createTelegramLinkAction, disconnectTelegramAction, sendTestTelegramAction } from "@/lib/actions/telegram";
 
 export function ConnectTelegramButton() {
-  const [pending, startTransition] = useTransition();
-  return <Button disabled={pending} onClick={() => startTransition(async () => {
-    const result = await createTelegramLinkAction();
-    if (result?.error) toast.error(result.error);
-    if (result?.url) window.open(result.url, "_blank", "noopener,noreferrer");
-  })}>{pending ? "Creating link..." : "Connect Telegram"}</Button>;
+  const [pending, setPending] = useState(false);
+  return <Button disabled={pending} onClick={async () => {
+    setPending(true);
+    try {
+      const result = await createTelegramLinkAction();
+      if (result?.error) toast.error(result.error);
+      if (result?.url) window.location.href = result.url;
+    } catch {
+      toast.error("Could not create Telegram connection link. Check your Vercel environment variables and logs.");
+    } finally {
+      setPending(false);
+    }
+  }}>{pending ? "Creating link..." : "Connect Telegram"}</Button>;
 }
 
 export function TelegramConnectionActions() {
