@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { MobileNavigation, Sidebar } from "@/components/dashboard/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+export const preferredRegion = "sin1";
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

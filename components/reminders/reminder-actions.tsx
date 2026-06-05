@@ -7,14 +7,19 @@ import { toast } from "sonner";
 import { Archive, Check, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { archiveReminderAction, completeReminderAction, deleteReminderAction } from "@/lib/actions/reminders";
+import type { ReminderStatus } from "@/lib/types";
 
-export function ReminderActions({ reminderId }: { reminderId: string }) {
+export function ReminderActions({ reminderId, status }: { reminderId: string; status: ReminderStatus }) {
   const router = useRouter();
   const [pendingAction, setPendingAction] = useState<"complete" | "archive" | "delete" | null>(null);
+  const [localStatus, setLocalStatus] = useState(status);
   const [, startTransition] = useTransition();
 
   function runAction(actionName: "complete" | "archive" | "delete", action: () => Promise<void>) {
+    const previousStatus = localStatus;
     setPendingAction(actionName);
+    if (actionName === "complete") setLocalStatus("completed");
+    if (actionName === "archive") setLocalStatus("archived");
     startTransition(async () => {
       try {
         await action();
@@ -25,6 +30,7 @@ export function ReminderActions({ reminderId }: { reminderId: string }) {
           router.refresh();
         }
       } catch (error) {
+        setLocalStatus(previousStatus);
         toast.error(error instanceof Error ? error.message : "Could not update reminder.");
       } finally {
         setPendingAction(null);
@@ -34,30 +40,39 @@ export function ReminderActions({ reminderId }: { reminderId: string }) {
 
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      <Button
-        size="sm"
-        variant="secondary"
-        disabled={pendingAction !== null}
-        onClick={() => runAction("complete", () => completeReminderAction(reminderId))}
-      >
-        <Check className="h-4 w-4" />
-        {pendingAction === "complete" ? "Completing..." : "Complete"}
-      </Button>
+      {localStatus === "completed" ? (
+        <Button size="sm" variant="secondary" disabled>
+          <Check className="h-4 w-4" />
+          Completed
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={pendingAction !== null || localStatus !== "active"}
+          onClick={() => runAction("complete", () => completeReminderAction(reminderId))}
+        >
+          <Check className="h-4 w-4" />
+          {pendingAction === "complete" ? "Completing..." : "Complete"}
+        </Button>
+      )}
       <Button asChild size="sm" variant="outline">
         <Link href={`/dashboard/reminders/${reminderId}/edit`}>
           <Pencil className="h-4 w-4" />
           Edit
         </Link>
       </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={pendingAction !== null}
-        onClick={() => runAction("archive", () => archiveReminderAction(reminderId))}
-      >
-        <Archive className="h-4 w-4" />
-        {pendingAction === "archive" ? "Archiving..." : "Archive"}
-      </Button>
+      {localStatus !== "archived" && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pendingAction !== null}
+          onClick={() => runAction("archive", () => archiveReminderAction(reminderId))}
+        >
+          <Archive className="h-4 w-4" />
+          {pendingAction === "archive" ? "Archiving..." : "Archive"}
+        </Button>
+      )}
       <Button
         size="sm"
         variant="destructive"

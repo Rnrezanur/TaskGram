@@ -17,6 +17,9 @@ export default async function RemindersPage({ searchParams }: { searchParams: Pr
     .order("due_at", { ascending: true });
   if (params.filter === "completed") query = query.eq("status", "completed");
   if (params.filter === "archived") query = query.eq("status", "archived");
+  if (params.filter === "recurring") query = query.neq("recurrence_type", "none").eq("status", "active");
+  if (params.filter === "upcoming") query = query.eq("status", "active").gte("due_at", new Date().toISOString());
+  if (params.filter === "overdue") query = query.eq("status", "active").lt("due_at", new Date().toISOString());
   if (params.q) query = query.ilike("title", `%${params.q}%`);
   const { data: reminderRows } = await query.returns<Reminder[]>();
   const reminders = reminderRows ?? [];

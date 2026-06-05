@@ -116,11 +116,18 @@ export async function updateReminderAction(id: string, _: unknown, formData: For
 
 export async function completeReminderAction(id: string) {
   const { supabase, user } = await requireUser();
-  const { data } = await supabase.from("reminders").select("*").eq("id", id).eq("user_id", user.id).single<Reminder>();
+  const { data } = await supabase
+    .from("reminders")
+    .select("id,user_id,due_at,reminder_minutes_before,recurrence_type,recurrence_interval,recurrence_end_at")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single<Reminder>();
   if (!data) return;
   if (data.recurrence_type === "none") {
-    await supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id);
-    await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", id).eq("delivery_status", "pending");
+    await Promise.all([
+      supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id),
+      supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", id).eq("delivery_status", "pending")
+    ]);
   } else {
     const next = nextRecurringDelivery(data);
     if (next) {

@@ -5,6 +5,7 @@ import { hashToken, verifyTelegramSecret } from "@/lib/telegram/token";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+export const preferredRegion = "sin1";
 
 type TelegramMessage = {
   message?: {
