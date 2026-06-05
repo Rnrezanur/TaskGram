@@ -10,7 +10,11 @@ export default async function RemindersPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  let query = supabase.from("reminders").select("*").eq("user_id", user!.id).order("due_at", { ascending: true });
+  let query = supabase
+    .from("reminders")
+    .select("id,user_id,title,description,category,custom_category,priority,due_at,timezone,reminder_minutes_before,telegram_enabled,recurrence_type,recurrence_interval,recurrence_end_at,next_occurrence_at,status,completed_at,archived_at,created_at,updated_at")
+    .eq("user_id", user!.id)
+    .order("due_at", { ascending: true });
   if (params.filter === "completed") query = query.eq("status", "completed");
   if (params.filter === "archived") query = query.eq("status", "archived");
   if (params.q) query = query.ilike("title", `%${params.q}%`);

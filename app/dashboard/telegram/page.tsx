@@ -7,7 +7,7 @@ import type { TelegramConnection } from "@/lib/types";
 export default async function TelegramPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: connection } = await supabase.from("telegram_connections").select("*").eq("user_id", user!.id).eq("is_active", true).maybeSingle<TelegramConnection>();
+  const { data: connection } = await supabase.from("telegram_connections").select("id,user_id,telegram_chat_id,telegram_username,telegram_first_name,is_active,connected_at,disconnected_at,last_test_message_at").eq("user_id", user!.id).eq("is_active", true).maybeSingle<TelegramConnection>();
   return (
     <div className="space-y-5">
       <div><h1 className="text-3xl font-bold">Telegram connection</h1><p className="text-muted-foreground">Securely link Telegram without manually entering a chat ID.</p></div>

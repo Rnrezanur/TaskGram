@@ -11,10 +11,20 @@ import type { Reminder, TelegramConnection } from "@/lib/types";
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user!.id).single();
-  const { data: reminderRows } = await supabase.from("reminders").select("*").eq("user_id", user!.id).order("due_at", { ascending: true }).returns<Reminder[]>();
+  const [profileResult, remindersResult, connectionResult] = await Promise.all([
+    supabase.from("profiles").select("full_name").eq("id", user!.id).single(),
+    supabase
+      .from("reminders")
+      .select("id,user_id,title,description,category,custom_category,priority,due_at,timezone,reminder_minutes_before,telegram_enabled,recurrence_type,recurrence_interval,recurrence_end_at,next_occurrence_at,status,completed_at,archived_at,created_at,updated_at")
+      .eq("user_id", user!.id)
+      .order("due_at", { ascending: true })
+      .returns<Reminder[]>(),
+    supabase.from("telegram_connections").select("id,user_id,telegram_chat_id,telegram_username,telegram_first_name,is_active,connected_at,disconnected_at,last_test_message_at").eq("user_id", user!.id).eq("is_active", true).maybeSingle<TelegramConnection>()
+  ]);
+  const profile = profileResult.data;
+  const reminderRows = remindersResult.data;
   const reminders = reminderRows ?? [];
-  const { data: connection } = await supabase.from("telegram_connections").select("*").eq("user_id", user!.id).eq("is_active", true).maybeSingle<TelegramConnection>();
+  const connection = connectionResult.data;
   // eslint-disable-next-line react-hooks/purity -- Server-rendered dashboard stats are intentionally time-based.
   const now = Date.now();
   const active = reminders.filter((r) => r.status === "active");

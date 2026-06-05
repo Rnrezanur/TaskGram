@@ -11,9 +11,13 @@ export default async function ReminderDetailsPage({ params }: { params: Promise<
   const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: reminder } = await supabase.from("reminders").select("*").eq("id", id).eq("user_id", user!.id).maybeSingle<Reminder>();
+  const [reminderResult, deliveriesResult] = await Promise.all([
+    supabase.from("reminders").select("*").eq("id", id).eq("user_id", user!.id).maybeSingle<Reminder>(),
+    supabase.from("notification_deliveries").select("id,reminder_id,user_id,scheduled_for,sent_at,delivery_status,attempt_count,telegram_message_id,error_message,snoozed_from_id,created_at,updated_at").eq("reminder_id", id).eq("user_id", user!.id).order("scheduled_for", { ascending: false }).returns<NotificationDelivery[]>()
+  ]);
+  const reminder = reminderResult.data;
   if (!reminder) notFound();
-  const { data: deliveryRows } = await supabase.from("notification_deliveries").select("*").eq("reminder_id", id).eq("user_id", user!.id).order("scheduled_for", { ascending: false }).returns<NotificationDelivery[]>();
+  const deliveryRows = deliveriesResult.data;
   const deliveries = deliveryRows ?? [];
   return (
     <div className="space-y-5">
