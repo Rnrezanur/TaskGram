@@ -3,6 +3,9 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { sendTelegramMessage } from "@/lib/telegram/api";
 import { hashToken, verifyTelegramSecret } from "@/lib/telegram/token";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
 type TelegramMessage = {
   message?: {
     chat: { id: number };

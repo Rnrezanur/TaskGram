@@ -131,12 +131,41 @@ The function calls `claim_due_notifications`, transitions due records from `pend
 ## Vercel Deployment
 
 1. Push the repository to GitHub.
-2. Import the project in Vercel.
-3. Add every variable from `.env.example`; never add `.env.local` to Git.
-4. Deploy.
-5. Configure the Telegram webhook to the deployed `/api/telegram/webhook`.
-6. Deploy the Supabase Edge Function and Cron job.
-7. Create a user, connect Telegram, send a test message, create a reminder, and verify delivery.
+2. Open [Vercel](https://vercel.com), click **Add New Project**, and import the GitHub repository.
+3. Keep the framework preset as **Next.js**. The included `vercel.json` uses `npm install` and `npm run build`.
+4. Add these environment variables in **Project Settings → Environment Variables**:
+
+```env
+NEXT_PUBLIC_APP_URL=https://YOUR_VERCEL_DOMAIN.vercel.app
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SECRET_KEY
+TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+TELEGRAM_BOT_USERNAME=YOUR_TELEGRAM_BOT_USERNAME_WITHOUT_AT
+TELEGRAM_WEBHOOK_SECRET=YOUR_LONG_RANDOM_WEBHOOK_SECRET
+SUPABASE_EDGE_FUNCTION_URL=https://YOUR_PROJECT_REF.functions.supabase.co/process-due-reminders
+CRON_AUTH_SECRET=YOUR_LONG_RANDOM_CRON_SECRET
+```
+
+5. Deploy the project.
+6. After deployment, set `NEXT_PUBLIC_APP_URL` to the final Vercel production URL if Vercel gave you a different URL, then redeploy.
+7. Configure the Telegram webhook to the deployed route:
+
+```powershell
+.\scripts\set-telegram-webhook.ps1 `
+  -BotToken "YOUR_TELEGRAM_BOT_TOKEN" `
+  -AppUrl "https://YOUR_VERCEL_DOMAIN.vercel.app" `
+  -WebhookSecret "YOUR_TELEGRAM_WEBHOOK_SECRET"
+```
+
+8. Deploy the Supabase Edge Function and Cron job.
+9. Create a user, connect Telegram, send a test message, create a reminder, and verify delivery.
+
+The production Telegram webhook URL is:
+
+```text
+https://YOUR_VERCEL_DOMAIN.vercel.app/api/telegram/webhook
+```
 
 ## Manual Testing Checklist
 
