@@ -131,7 +131,6 @@ export async function completeReminderAction(id: string) {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/reminders");
   revalidatePath(`/dashboard/reminders/${id}`);
-  redirect("/dashboard/reminders");
 }
 
 export async function archiveReminderAction(id: string) {
@@ -141,7 +140,6 @@ export async function archiveReminderAction(id: string) {
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/reminders");
   revalidatePath(`/dashboard/reminders/${id}`);
-  redirect("/dashboard/reminders");
 }
 
 export async function deleteReminderAction(id: string) {
@@ -149,7 +147,8 @@ export async function deleteReminderAction(id: string) {
   await supabase.from("notification_deliveries").delete().eq("reminder_id", id).eq("user_id", user.id);
   await supabase.from("reminders").delete().eq("id", id).eq("user_id", user.id);
   revalidatePath("/dashboard");
-  redirect("/dashboard/reminders");
+  revalidatePath("/dashboard/reminders");
+  revalidatePath(`/dashboard/reminders/${id}`);
 }
 
 export async function snoozeReminderAction(_: unknown, formData: FormData) {
