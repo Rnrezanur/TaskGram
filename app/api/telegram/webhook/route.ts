@@ -16,7 +16,7 @@ type TelegramMessage = {
     id: string;
     from: { id: number };
     data?: string;
-    message?: { chat: { id: number } };
+    message?: { chat: { id: number }; message_id: number; text?: string };
   };
 };
 
@@ -29,6 +29,23 @@ async function answerCallback(id: string, text: string) {
     });
   } catch {
     // Callback acknowledgement failure should not leak implementation details.
+  }
+}
+
+async function editTelegramMessage(chatId: number, messageId: number, text: string) {
+  try {
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+        parse_mode: "HTML"
+      })
+    });
+  } catch {
+    // Editing the already-sent message is a convenience; callback state is still updated in the database.
   }
 }
 
@@ -58,6 +75,9 @@ export async function POST(request: NextRequest) {
         await supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", reminderId).eq("user_id", connection.user_id);
         await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", reminderId).eq("delivery_status", "pending");
         await answerCallback(update.callback_query.id, "Marked complete.");
+        if (update.callback_query.message?.message_id) {
+          await editTelegramMessage(chatId, update.callback_query.message.message_id, `${update.callback_query.message.text ?? "TaskGram reminder"}\n\nCompleted in TaskGram.`);
+        }
       }
       if (action === "snooze10") {
         await supabase.from("notification_deliveries").insert({ reminder_id: reminderId, user_id: connection.user_id, scheduled_for: new Date(Date.now() + 10 * 60_000).toISOString(), delivery_status: "pending" });

@@ -129,6 +129,9 @@ export async function completeReminderAction(id: string) {
     }
   }
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/reminders");
+  revalidatePath(`/dashboard/reminders/${id}`);
+  redirect("/dashboard/reminders");
 }
 
 export async function archiveReminderAction(id: string) {
@@ -136,6 +139,9 @@ export async function archiveReminderAction(id: string) {
   await supabase.from("reminders").update({ status: "archived", archived_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id);
   await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", id).eq("delivery_status", "pending");
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/reminders");
+  revalidatePath(`/dashboard/reminders/${id}`);
+  redirect("/dashboard/reminders");
 }
 
 export async function deleteReminderAction(id: string) {
