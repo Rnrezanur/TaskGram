@@ -10,6 +10,10 @@ export default async function RemindersPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
   let query = supabase
     .from("reminders")
     .select("id,user_id,title,description,category,custom_category,priority,due_at,timezone,reminder_minutes_before,telegram_enabled,recurrence_type,recurrence_interval,recurrence_end_at,next_occurrence_at,status,completed_at,archived_at,created_at,updated_at")
@@ -17,16 +21,48 @@ export default async function RemindersPage({ searchParams }: { searchParams: Pr
     .order("due_at", { ascending: true });
   if (params.filter === "completed") query = query.eq("status", "completed");
   if (params.filter === "archived") query = query.eq("status", "archived");
+  if (params.filter === "today") query = query.eq("status", "active").gte("due_at", todayStart.toISOString()).lt("due_at", tomorrowStart.toISOString());
   if (params.filter === "recurring") query = query.neq("recurrence_type", "none").eq("status", "active");
   if (params.filter === "upcoming") query = query.eq("status", "active").gte("due_at", new Date().toISOString());
   if (params.filter === "overdue") query = query.eq("status", "active").lt("due_at", new Date().toISOString());
   if (params.q) query = query.ilike("title", `%${params.q}%`);
+  query = query.limit(75);
   const { data: reminderRows } = await query.returns<Reminder[]>();
   const reminders = reminderRows ?? [];
+  const filters = [
+    ["all", "All"],
+    ["today", "Today"],
+    ["upcoming", "Upcoming"],
+    ["completed", "Completed"],
+    ["overdue", "Overdue"],
+    ["recurring", "Recurring"],
+    ["archived", "Archived"]
+  ];
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><h1 className="text-3xl font-bold">Reminders</h1><p className="text-muted-foreground">Search, filter, sort, edit, complete, snooze, archive, or delete tasks.</p></div><Button asChild><Link href="/dashboard/reminders/new">Add Reminder</Link></Button></div>
-      <form className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-[1fr_auto_auto]"><Input name="q" placeholder="Search reminders" defaultValue={params.q ?? ""} /><select name="filter" defaultValue={params.filter ?? "all"} className="rounded-md border bg-background px-3 py-2 text-sm"><option value="all">All</option><option value="today">Today</option><option value="upcoming">Upcoming</option><option value="completed">Completed</option><option value="archived">Archived</option><option value="overdue">Overdue</option><option value="recurring">Recurring</option></select><Button variant="outline">Apply</Button></form>
+      <div className="rounded-lg border bg-card p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div><h1 className="text-3xl font-bold">Tasks</h1><p className="text-muted-foreground">Add work, search quickly, and keep finished tasks out of your way.</p></div>
+          <Button asChild><Link href="/dashboard/reminders/new">Add task</Link></Button>
+        </div>
+      </div>
+      <form className="space-y-3 rounded-lg border bg-card p-4">
+        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <Input name="q" placeholder="Search tasks" defaultValue={params.q ?? ""} />
+          <Button variant="outline">Search</Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {filters.map(([value, label]) => (
+            <Link
+              key={value}
+              href={`/dashboard/reminders?filter=${value}${params.q ? `&q=${encodeURIComponent(params.q)}` : ""}`}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${((params.filter ?? "all") === value) ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      </form>
       <div className="space-y-3">{reminders.length ? reminders.map((r) => <ReminderCard key={r.id} reminder={r} />) : <EmptyState title="No matching reminders" text="Adjust filters or create a new reminder." />}</div>
     </div>
   );
