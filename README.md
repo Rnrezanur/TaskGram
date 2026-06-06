@@ -168,6 +168,16 @@ The production Telegram webhook URL is:
 https://YOUR_VERCEL_DOMAIN.vercel.app/api/telegram/webhook
 ```
 
+Configure the Telegram Mini App **Add Task** menu button:
+
+```powershell
+.\scripts\set-telegram-mini-app.ps1 `
+  -BotToken "YOUR_TELEGRAM_BOT_TOKEN" `
+  -AppUrl "https://YOUR_VERCEL_DOMAIN.vercel.app"
+```
+
+The Mini App opens `/telegram/add-task`, verifies Telegram-signed `initData` server-side, matches the linked Telegram account, and creates the reminder plus its pending notification delivery.
+
 ## Manual Testing Checklist
 
 - New user can sign up and gets a profile row.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendTelegramMessage } from "@/lib/telegram/api";
 import { hashToken, verifyTelegramSecret } from "@/lib/telegram/token";
+import { invariantEnv } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -48,6 +49,17 @@ async function editTelegramMessage(chatId: number, messageId: number, text: stri
   } catch {
     // Editing the already-sent message is a convenience; callback state is still updated in the database.
   }
+}
+
+function miniAppMarkup() {
+  return {
+    inline_keyboard: [[
+      {
+        text: "Add Task",
+        web_app: { url: `${invariantEnv("NEXT_PUBLIC_APP_URL")}/telegram/add-task` }
+      }
+    ]]
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -124,7 +136,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (text.startsWith("/help")) {
-      await sendTelegramMessage(chatId, "TaskGram commands:\n/start - connect from a secure website link\n/status - check connection\n/disconnect - disconnect Telegram\n\nManage reminders from the TaskGram website.");
+      await sendTelegramMessage(chatId, "TaskGram commands:\n/start - connect from a secure website link\n/status - check connection\n/disconnect - disconnect Telegram\n\nUse Add Task to create reminders without leaving Telegram.", miniAppMarkup());
     } else if (text.startsWith("/status")) {
       const { data } = await supabase.from("telegram_connections").select("id").eq("telegram_chat_id", chatId).eq("is_active", true).maybeSingle();
       await sendTelegramMessage(chatId, data ? "Your Telegram account is actively connected to TaskGram." : "This Telegram chat is not connected to TaskGram.");
@@ -132,7 +144,7 @@ export async function POST(request: NextRequest) {
       await supabase.from("telegram_connections").update({ is_active: false, disconnected_at: new Date().toISOString() }).eq("telegram_chat_id", chatId);
       await sendTelegramMessage(chatId, "Telegram has been disconnected from TaskGram.");
     } else if (text.startsWith("/start")) {
-      await sendTelegramMessage(chatId, "Welcome to TaskGram.\n\nConnect your TaskGram account from the website to start receiving reminder notifications.");
+      await sendTelegramMessage(chatId, "Welcome to TaskGram.\n\nConnect your TaskGram account from the website to start receiving reminder notifications, or add a task if you are already connected.", miniAppMarkup());
     }
     return NextResponse.json({ ok: true });
   } catch {
