@@ -1,205 +1,293 @@
 # TaskGram
 
-TaskGram is a production-ready personal reminder and to-do website that sends secure Telegram notifications. It uses Next.js App Router, TypeScript, Tailwind CSS, shadcn-style components, Supabase Auth/PostgreSQL/RLS/Edge Functions/Cron, and the Telegram Bot API.
+**A production-ready task manager that delivers reliable reminders through Telegram.**
 
-## Build Checklist
+TaskGram combines a responsive productivity dashboard with Telegram notifications, recurring schedules, delivery tracking, secure account linking, and a Telegram Mini App for creating tasks without leaving the chat.
 
-- [x] Phase 1: Scaffold Next.js, Tailwind, reusable UI, landing, auth pages
-- [x] Phase 2: Supabase clients, authentication actions, protected dashboard layout
-- [x] Phase 3: SQL migrations, RLS, reminder CRUD, delivery records
-- [x] Phase 4: Telegram secure one-time token linking, webhook, test/disconnect
-- [x] Phase 5: Supabase Edge Function for every-minute due reminder processing
-- [x] Phase 6: Recurrence, snooze, calendar, notification history, settings, dark mode
-- [x] Phase 7: Tests, deployment docs, manual QA checklist
+[Live Application](https://task-gram-one.vercel.app) | [Telegram Bot](https://t.me/taskgram_rnrezanur_bot)
 
-## Features
+## Why TaskGram?
 
-- Email/password sign-up, login, logout, and password reset through Supabase Auth
-- Protected dashboard with summary cards, reminders, calendar, notifications, Telegram, and settings
-- Create, edit, complete, archive, delete, snooze, and recur reminders
-- Secure Telegram linking with 10-minute one-time tokens stored only as SHA-256 hashes
-- Telegram webhook for `/start`, `/help`, `/status`, `/disconnect`, and inline callback buttons
-- Automatic due reminder processing with atomic claiming, retries, and duplicate prevention
-- Notification delivery history with pending, processing, sent, failed, and cancelled statuses
-- Supabase Row Level Security policies for profiles, Telegram connections, reminders, and deliveries
-- Light/dark theme support and responsive desktop/mobile navigation
+Traditional reminder applications depend on users regularly opening the app or allowing browser notifications. TaskGram delivers reminders through Telegram, a channel users already check throughout the day.
 
-## Screenshots
+The project demonstrates full-stack product engineering across authentication, authorization, relational data modeling, background processing, external API integration, concurrency control, responsive UI, and production deployment.
 
-Add screenshots after deployment:
+## Product Highlights
 
-- Landing page: `public/screenshots/landing.png`
-- Dashboard: `public/screenshots/dashboard.png`
-- Telegram connection: `public/screenshots/telegram.png`
+- Full task lifecycle: create, edit, complete, archive, delete, snooze, search, and filter
+- One-time and recurring reminders with timezone-aware scheduling
+- Automated Telegram delivery through Supabase Cron and Edge Functions
+- Secure Telegram account linking without asking users for chat IDs
+- Telegram inline actions for completing and snoozing reminders
+- Telegram Mini App with a mobile task-creation interface
+- Delivery history with pending, processing, sent, failed, and cancelled states
+- Responsive dashboard, calendar view, settings, dark mode, and admin dashboard
+- Per-user data isolation through PostgreSQL Row Level Security
+
+## Engineering Highlights
+
+### Reliable Reminder Delivery
+
+Supabase Cron invokes an Edge Function every minute. Due notifications are atomically claimed using PostgreSQL row locking before Telegram delivery.
+
+```text
+pending -> processing -> sent
+                      -> failed -> retry
+```
+
+This design prevents duplicate delivery during overlapping Cron executions and supports up to three retry attempts for temporary failures.
+
+### Secure Telegram Linking
+
+TaskGram never asks users to manually enter a Telegram chat ID.
+
+1. An authenticated user requests a connection link.
+2. The server generates a cryptographically secure one-time token.
+3. Only the SHA-256 token hash is stored.
+4. The token expires after ten minutes and can only be used once.
+5. Telegram sends the `/start` payload to the verified webhook.
+6. The server links the Telegram chat to the correct TaskGram user.
+
+### Telegram Mini App Security
+
+The Telegram Mini App opens a website-style Add Task form inside Telegram. The API verifies Telegram-signed `initData` using HMAC before matching the Telegram identity to an active TaskGram connection.
+
+### Authorization and Data Isolation
+
+- Supabase Auth manages user sessions.
+- Dashboard routes are protected by the Next.js proxy.
+- PostgreSQL RLS ensures users can only access their own profile, reminders, Telegram connection, and delivery history.
+- Service-role access is restricted to trusted server routes, webhooks, admin operations, and scheduled functions.
+- Admin access is controlled through a server-only email allowlist.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    User["Web or Telegram User"] --> Next["Next.js on Vercel"]
+    User --> Bot["Telegram Bot API"]
+    Next --> Auth["Supabase Auth"]
+    Next --> DB["Supabase PostgreSQL + RLS"]
+    Bot --> Webhook["Telegram Webhook"]
+    Webhook --> DB
+    Cron["Supabase Cron: every minute"] --> Edge["process-due-reminders Edge Function"]
+    Edge --> DB
+    Edge --> Bot
+    Mini["Telegram Mini App"] --> MiniAPI["Verified Mini App API"]
+    MiniAPI --> DB
+```
 
 ## Technology Stack
 
-- Next.js App Router, React, TypeScript
-- Tailwind CSS, shadcn/ui-style primitives, Lucide React, next-themes, Sonner
-- React Hook Form-ready Zod validation and server-side validation
-- Supabase PostgreSQL, Auth, Row Level Security, Edge Functions, Cron
-- Telegram Bot API webhooks and `sendMessage`
-- Vitest for critical scheduling logic
+| Area | Technology |
+| --- | --- |
+| Framework | Next.js App Router, React, TypeScript |
+| UI | Tailwind CSS, shadcn-style primitives, Lucide React, next-themes, Sonner |
+| Validation | Zod, server-side validation |
+| Database | Supabase PostgreSQL |
+| Authentication | Supabase Auth |
+| Authorization | Supabase Row Level Security |
+| Background jobs | Supabase Cron, Supabase Edge Functions |
+| Messaging | Telegram Bot API, webhooks, inline keyboards, Mini Apps |
+| Deployment | Vercel and Supabase |
+| Testing | Vitest, TypeScript, ESLint, production build verification |
+
+## Core Workflows
+
+### Reminder Creation
+
+The user selects a local date, time, timezone, reminder offset, and recurrence rule. TaskGram converts the schedule to UTC and creates a unique pending delivery record.
+
+### Recurring Completion
+
+Completing a one-time task permanently completes it and cancels future pending notifications. Completing a recurring task advances it to the next occurrence and schedules the next Telegram notification.
+
+### Telegram Delivery
+
+The Edge Function claims due records, loads the user and reminder context, formats the message in the user's timezone, sends it through Telegram, and records the outcome.
+
+## Project Structure
+
+```text
+app/
+  admin/                         Protected admin dashboard
+  api/telegram/                  Webhook and Mini App APIs
+  dashboard/                     Authenticated product experience
+  telegram/add-task/             Telegram Mini App
+components/
+  dashboard/                     Navigation and dashboard components
+  reminders/                     Task cards, actions, badges, and forms
+  telegram/                      Connection and Mini App components
+lib/
+  actions/                       Server actions
+  supabase/                      Browser, server, and proxy clients
+  telegram/                      API, token, message, and Mini App security
+supabase/
+  migrations/                    Schema, indexes, triggers, RLS, claim function
+  functions/process-due-reminders/
+scripts/                         Telegram webhook and Mini App setup helpers
+tests/                           Scheduling tests
+```
 
 ## Local Development
 
-1. Install dependencies:
+### Prerequisites
+
+- Node.js 20 or newer
+- A Supabase project
+- A Telegram bot created through BotFather
+
+### Installation
 
 ```bash
+git clone https://github.com/Rnrezanur/TaskGram.git
+cd TaskGram
 npm install
 ```
 
-2. Copy environment variables:
-
-```bash
-cp .env.example .env.local
-```
-
-3. Fill `.env.local`:
+Create `.env.local` from `.env.example` and add the required values:
 
 ```env
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_USERNAME=
 TELEGRAM_WEBHOOK_SECRET=
+
 SUPABASE_EDGE_FUNCTION_URL=
 CRON_AUTH_SECRET=
+ADMIN_EMAILS=
 ```
 
-4. Run checks:
-
-```bash
-npm run typecheck
-npm run lint
-npm test
-```
-
-5. Start the app:
+Run the project:
 
 ```bash
 npm run dev
 ```
 
-## Supabase Setup
+Open [http://localhost:3000](http://localhost:3000).
 
-1. Create a Supabase project.
-2. In SQL Editor, run `supabase/migrations/0001_initial_schema.sql`.
-3. Confirm RLS is enabled on `profiles`, `telegram_connections`, `telegram_link_tokens`, `reminders`, and `notification_deliveries`.
-4. Confirm the Auth trigger `on_auth_user_created` creates a profile after sign-up.
-5. Store service-role credentials only in server-side environments.
+## Database Setup
 
-## Telegram BotFather Setup
+Run the migration from the Supabase SQL Editor:
 
-1. Open BotFather and create a bot with `/newbot`.
-2. Copy the bot token into `TELEGRAM_BOT_TOKEN`.
-3. Copy the bot username without `@` into `TELEGRAM_BOT_USERNAME`.
-4. Generate a strong random `TELEGRAM_WEBHOOK_SECRET`.
-
-Set the webhook after deploying:
-
-```bash
-curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
-  -H "content-type: application/json" \
-  -d '{"url":"https://YOUR_DOMAIN.com/api/telegram/webhook","secret_token":"YOUR_TELEGRAM_WEBHOOK_SECRET"}'
+```text
+supabase/migrations/0001_initial_schema.sql
 ```
 
-## Supabase Edge Function and Cron
+The migration creates:
 
-Deploy the Edge Function:
+- user profiles and automatic profile creation
+- Telegram connections and one-time link tokens
+- reminders and notification delivery history
+- constraints and indexes
+- RLS policies
+- the atomic `claim_due_notifications` function
 
-```bash
-supabase functions deploy process-due-reminders
-```
+## Telegram Setup
 
-Set function secrets:
+Create a bot through BotFather and add its token and username to the environment.
 
-```bash
-supabase secrets set TELEGRAM_BOT_TOKEN=... CRON_AUTH_SECRET=... NEXT_PUBLIC_APP_URL=https://YOUR_DOMAIN.com
-```
-
-Create a Supabase Cron job that runs every minute and calls the Edge Function with:
-
-```http
-Authorization: Bearer YOUR_CRON_AUTH_SECRET
-```
-
-The function calls `claim_due_notifications`, transitions due records from `pending` or retryable `failed` to `processing`, sends Telegram messages, then records `sent` or `failed`.
-
-## Vercel Deployment
-
-1. Push the repository to GitHub.
-2. Open [Vercel](https://vercel.com), click **Add New Project**, and import the GitHub repository.
-3. Keep the framework preset as **Next.js**. The included `vercel.json` uses `npm install` and `npm run build`.
-4. Add these environment variables in **Project Settings → Environment Variables**:
-
-```env
-NEXT_PUBLIC_APP_URL=https://YOUR_VERCEL_DOMAIN.vercel.app
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SECRET_KEY
-TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-TELEGRAM_BOT_USERNAME=YOUR_TELEGRAM_BOT_USERNAME_WITHOUT_AT
-TELEGRAM_WEBHOOK_SECRET=YOUR_LONG_RANDOM_WEBHOOK_SECRET
-SUPABASE_EDGE_FUNCTION_URL=https://YOUR_PROJECT_REF.functions.supabase.co/process-due-reminders
-CRON_AUTH_SECRET=YOUR_LONG_RANDOM_CRON_SECRET
-ADMIN_EMAILS=your-admin-email@example.com
-```
-
-5. Deploy the project.
-6. After deployment, set `NEXT_PUBLIC_APP_URL` to the final Vercel production URL if Vercel gave you a different URL, then redeploy.
-7. Configure the Telegram webhook to the deployed route:
+Set the production webhook:
 
 ```powershell
 .\scripts\set-telegram-webhook.ps1 `
   -BotToken "YOUR_TELEGRAM_BOT_TOKEN" `
-  -AppUrl "https://YOUR_VERCEL_DOMAIN.vercel.app" `
+  -AppUrl "https://YOUR_DOMAIN" `
   -WebhookSecret "YOUR_TELEGRAM_WEBHOOK_SECRET"
 ```
 
-8. Deploy the Supabase Edge Function and Cron job.
-9. Create a user, connect Telegram, send a test message, create a reminder, and verify delivery.
-
-The production Telegram webhook URL is:
-
-```text
-https://YOUR_VERCEL_DOMAIN.vercel.app/api/telegram/webhook
-```
-
-Configure the Telegram Mini App **Add Task** menu button:
+Configure the Telegram Mini App menu button:
 
 ```powershell
 .\scripts\set-telegram-mini-app.ps1 `
   -BotToken "YOUR_TELEGRAM_BOT_TOKEN" `
-  -AppUrl "https://YOUR_VERCEL_DOMAIN.vercel.app"
+  -AppUrl "https://YOUR_DOMAIN"
 ```
 
-The Mini App opens `/telegram/add-task`, verifies Telegram-signed `initData` server-side, matches the linked Telegram account, and creates the reminder plus its pending notification delivery.
+## Edge Function and Cron Setup
 
-## Manual Testing Checklist
+Link the Supabase project and deploy the function:
 
-- New user can sign up and gets a profile row.
-- User can log in, open `/dashboard`, and log out.
-- Unauthenticated users are redirected away from dashboard pages.
-- User can create, edit, complete, archive, and delete reminders.
-- User cannot read or mutate another user's reminders because of RLS.
-- Telegram connection link is generated and opens the bot.
-- Expired and used tokens are rejected.
-- `/start <token>` connects the correct Telegram chat.
-- Test message arrives in Telegram.
-- `/disconnect` and website disconnect both deactivate the connection.
-- A due reminder sends exactly once and records the Telegram message ID.
-- Failed sends store error details and retry up to 3 attempts.
-- Snooze creates a future pending notification.
-- Recurring reminders schedule the next occurrence without deleting history.
-- Telegram inline callbacks cannot modify another user's reminder.
+```bash
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase functions deploy process-due-reminders --no-verify-jwt
+```
 
-## Troubleshooting
+Set Edge Function secrets:
 
-- `Missing environment variable`: confirm the variable exists in `.env.local`, Vercel, or Supabase function secrets.
-- Telegram webhook returns 401: confirm `secret_token` matches `TELEGRAM_WEBHOOK_SECRET`.
-- Reminders do not send: check Supabase Cron headers, Edge Function logs, active Telegram connection, and pending delivery rows.
-- Auth profile missing: rerun the migration and verify the `on_auth_user_created` trigger exists.
-- RLS blocks app writes: make sure the request is using the signed-in user's Supabase session, not a public unauthenticated client.
+```bash
+npx supabase secrets set TELEGRAM_BOT_TOKEN=YOUR_TOKEN
+npx supabase secrets set CRON_AUTH_SECRET=YOUR_SECRET
+npx supabase secrets set NEXT_PUBLIC_APP_URL=https://YOUR_DOMAIN
+```
+
+Schedule the Edge Function every minute:
+
+```sql
+create extension if not exists pg_net with schema extensions;
+create extension if not exists pg_cron with schema extensions;
+
+select cron.schedule(
+  'process-due-reminders-every-minute',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://YOUR_PROJECT_REF.functions.supabase.co/process-due-reminders',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer YOUR_CRON_AUTH_SECRET',
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+## Vercel Deployment
+
+1. Import the GitHub repository into Vercel.
+2. Keep the Next.js framework preset and root directory.
+3. Add every variable from `.env.example`.
+4. Set `NEXT_PUBLIC_APP_URL` to the final production URL.
+5. Set `ADMIN_EMAILS` to a comma-separated list of administrator emails.
+6. Deploy and configure the Telegram webhook and Mini App menu button.
+
+## Quality Checks
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+The project is maintained against strict TypeScript checks, zero-warning linting, scheduling tests, and production build verification.
+
+## Security Considerations
+
+- Telegram and Supabase service-role secrets never reach browser code.
+- Telegram webhook requests require the configured secret header.
+- Mini App requests require valid Telegram-signed `initData`.
+- One-time connection tokens are hashed, expiring, and single-use.
+- RLS protects every user-facing database table.
+- Notification claiming uses atomic database locking.
+- Input is validated on trusted server boundaries.
+
+## Future Improvements
+
+- Push and email notification channels
+- Team workspaces and shared task assignment
+- Natural-language task creation
+- Analytics for task completion and routine consistency
+- Expanded integration and end-to-end test coverage
+
+## Author
+
+Built by **Md Rezanur Bin Shamim** as a full-stack productivity and messaging integration project.
+
+This repository demonstrates the ability to design, implement, secure, deploy, and operate a real-world application across frontend, backend, database, scheduled processing, and third-party APIs.
