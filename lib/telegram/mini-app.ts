@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { createServiceClient } from "@/lib/supabase/server";
 import { invariantEnv } from "@/lib/utils";
 
 type TelegramMiniAppUser = {
@@ -33,4 +34,22 @@ export function verifyMiniAppInitData(initData: string, maxAgeSeconds = 3600) {
   }
 
   return JSON.parse(userJson) as TelegramMiniAppUser;
+}
+
+export async function getMiniAppContext(initData: string | null) {
+  if (!initData) throw new Error("Open TaskGram from the Telegram bot.");
+
+  const telegramUser = verifyMiniAppInitData(initData);
+  const supabase = createServiceClient();
+  const { data: connection, error } = await supabase
+    .from("telegram_connections")
+    .select("user_id")
+    .eq("telegram_chat_id", telegramUser.id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!connection) throw new Error("Connect this Telegram account to TaskGram first.");
+
+  return { supabase, userId: connection.user_id as string, telegramUser };
 }

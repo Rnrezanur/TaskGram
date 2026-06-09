@@ -7,11 +7,11 @@ param(
 )
 
 $cleanAppUrl = $AppUrl.TrimEnd("/")
-$miniAppUrl = "$cleanAppUrl/telegram/add-task"
+$miniAppUrl = "$cleanAppUrl/telegram/workspace"
 $body = @{
   menu_button = @{
     type = "web_app"
-    text = "Add Task"
+    text = "TaskGram"
     web_app = @{
       url = $miniAppUrl
     }
@@ -24,4 +24,4 @@ Invoke-RestMethod `
   -ContentType "application/json" `
   -Body $body
 
-Write-Host "Telegram Add Task menu button set to $miniAppUrl"
+Write-Host "Telegram TaskGram workspace menu button set to $miniAppUrl"

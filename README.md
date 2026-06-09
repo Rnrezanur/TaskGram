@@ -52,7 +52,7 @@ TaskGram never asks users to manually enter a Telegram chat ID.
 
 ### Telegram Mini App Security
 
-The Telegram Mini App opens a website-style Add Task form inside Telegram. The API verifies Telegram-signed `initData` using HMAC before matching the Telegram identity to an active TaskGram connection.
+The Telegram Mini App opens a compact TaskGram workspace inside Telegram. Users can create and manage tasks, keep notes, and track income and expenses. Every Mini App API request verifies Telegram-signed `initData` using HMAC before matching the Telegram identity to an active TaskGram connection.
 
 ### Authorization and Data Isolation
 
@@ -115,7 +115,7 @@ app/
   admin/                         Protected admin dashboard
   api/telegram/                  Webhook and Mini App APIs
   dashboard/                     Authenticated product experience
-  telegram/add-task/             Telegram Mini App
+  telegram/workspace/            Telegram Mini App workspace
 components/
   dashboard/                     Navigation and dashboard components
   reminders/                     Task cards, actions, badges, and forms

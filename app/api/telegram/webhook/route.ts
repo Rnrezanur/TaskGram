@@ -55,8 +55,8 @@ function miniAppMarkup() {
   return {
     inline_keyboard: [[
       {
-        text: "Add Task",
-        web_app: { url: `${invariantEnv("NEXT_PUBLIC_APP_URL")}/telegram/add-task` }
+        text: "Open TaskGram",
+        web_app: { url: `${invariantEnv("NEXT_PUBLIC_APP_URL")}/telegram/workspace` }
       }
     ]]
   };
@@ -136,7 +136,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (text.startsWith("/help")) {
-      await sendTelegramMessage(chatId, "TaskGram commands:\n/start - connect from a secure website link\n/status - check connection\n/disconnect - disconnect Telegram\n\nUse Add Task to create reminders without leaving Telegram.", miniAppMarkup());
+      await sendTelegramMessage(chatId, "TaskGram commands:\n/start - connect from a secure website link\n/app - open your TaskGram workspace\n/status - check connection\n/disconnect - disconnect Telegram\n\nThe workspace lets you manage tasks, notes, income, and expenses without leaving Telegram.", miniAppMarkup());
+    } else if (text.startsWith("/app")) {
+      await sendTelegramMessage(chatId, "Open your TaskGram workspace to manage tasks, notes, income, and expenses.", miniAppMarkup());
     } else if (text.startsWith("/status")) {
       const { data } = await supabase.from("telegram_connections").select("id").eq("telegram_chat_id", chatId).eq("is_active", true).maybeSingle();
       await sendTelegramMessage(chatId, data ? "Your Telegram account is actively connected to TaskGram." : "This Telegram chat is not connected to TaskGram.");
@@ -144,7 +146,7 @@ export async function POST(request: NextRequest) {
       await supabase.from("telegram_connections").update({ is_active: false, disconnected_at: new Date().toISOString() }).eq("telegram_chat_id", chatId);
       await sendTelegramMessage(chatId, "Telegram has been disconnected from TaskGram.");
     } else if (text.startsWith("/start")) {
-      await sendTelegramMessage(chatId, "Welcome to TaskGram.\n\nConnect your TaskGram account from the website to start receiving reminder notifications, or add a task if you are already connected.", miniAppMarkup());
+      await sendTelegramMessage(chatId, "Welcome to TaskGram.\n\nConnect your TaskGram account from the website, then use the workspace to manage your day directly from Telegram.", miniAppMarkup());
     }
     return NextResponse.json({ ok: true });
   } catch {

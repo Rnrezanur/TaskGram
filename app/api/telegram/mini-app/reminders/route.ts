@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServiceClient } from "@/lib/supabase/server";
 import { buildInitialDelivery } from "@/lib/reminders/schedule";
 import { zonedDateTimeToUtc } from "@/lib/time";
-import { verifyMiniAppInitData } from "@/lib/telegram/mini-app";
+import { getMiniAppContext } from "@/lib/telegram/mini-app";
 
 export const runtime = "nodejs";
 export const preferredRegion = "sin1";
@@ -21,24 +20,11 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const initData = request.headers.get("x-telegram-init-data");
-    if (!initData) return NextResponse.json({ error: "Open this form from the TaskGram Telegram bot." }, { status: 401 });
-
-    const telegramUser = verifyMiniAppInitData(initData);
+    const { supabase, userId } = await getMiniAppContext(request.headers.get("x-telegram-init-data"));
     const parsed = schema.safeParse(await request.json());
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid task." }, { status: 400 });
 
-    const supabase = createServiceClient();
-    const { data: connection } = await supabase
-      .from("telegram_connections")
-      .select("user_id")
-      .eq("telegram_chat_id", telegramUser.id)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (!connection) return NextResponse.json({ error: "Connect this Telegram account to TaskGram first." }, { status: 403 });
-
-    const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", connection.user_id).single();
+    const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", userId).single();
     const timezone = profile?.timezone || "Asia/Dhaka";
     const dueAt = zonedDateTimeToUtc(parsed.data.date, parsed.data.time, timezone);
     if (dueAt.getTime() <= Date.now()) return NextResponse.json({ error: "Choose a future date and time." }, { status: 400 });
@@ -46,7 +32,7 @@ export async function POST(request: NextRequest) {
     const { data: reminder, error: reminderError } = await supabase
       .from("reminders")
       .insert({
-        user_id: connection.user_id,
+        user_id: userId,
         title: parsed.data.title,
         description: parsed.data.description || null,
         category: parsed.data.category,
@@ -66,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     const { error: deliveryError } = await supabase
       .from("notification_deliveries")
-      .insert(buildInitialDelivery(reminder.id, connection.user_id, dueAt, parsed.data.reminderMinutesBefore));
+      .insert(buildInitialDelivery(reminder.id, userId, dueAt, parsed.data.reminderMinutesBefore));
     if (deliveryError) throw deliveryError;
 
     return NextResponse.json({ success: true, reminderId: reminder.id });
