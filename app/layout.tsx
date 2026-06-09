@@ -5,7 +5,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "TaskGram - Telegram reminders",
-  description: "Never miss a task. Get reminded on Telegram."
+  description: "Never miss a task. Get reminded on Telegram.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg"
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
