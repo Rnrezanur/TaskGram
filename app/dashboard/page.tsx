@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Bell, CheckCircle2, Clock, Plus } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle2, Clock, NotebookPen, Plus, WalletCards } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { ReminderCard } from "@/components/reminders/reminder-card";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -53,6 +53,16 @@ export default async function DashboardPage() {
         </div>
       </div>
       {!connection && <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">Connect Telegram to receive automatic reminder notifications.</div>}
+      <div className="grid gap-3 md:grid-cols-2">
+        <Link href="/dashboard/notes" className="flex items-center gap-4 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50">
+          <div className="flex h-11 w-11 items-center justify-center rounded-md bg-sky-500/10 text-sky-600"><NotebookPen className="h-5 w-5" /></div>
+          <div><p className="font-semibold">Keep notes</p><p className="text-sm text-muted-foreground">Capture ideas, plans, and useful information.</p></div>
+        </Link>
+        <Link href="/dashboard/finance" className="flex items-center gap-4 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50">
+          <div className="flex h-11 w-11 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600"><WalletCards className="h-5 w-5" /></div>
+          <div><p className="font-semibold">Track money</p><p className="text-sm text-muted-foreground">Record income, expenses, and monthly spending.</p></div>
+        </Link>
+      </div>
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Tasks today" value={todayResult.count ?? 0} icon={Clock} />
         <StatCard label="Upcoming" value={upcomingResult.count ?? 0} icon={Bell} />

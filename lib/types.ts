@@ -2,6 +2,8 @@ export type ReminderStatus = "active" | "completed" | "archived" | "cancelled";
 export type DeliveryStatus = "pending" | "processing" | "sent" | "failed" | "cancelled";
 export type Priority = "low" | "medium" | "high";
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "custom_days" | "custom_weeks";
+export type NoteColor = "default" | "blue" | "green" | "amber" | "rose";
+export type TransactionType = "income" | "expense";
 
 export type Profile = {
   id: string;
@@ -61,6 +63,31 @@ export type NotificationDelivery = {
   telegram_message_id: number | null;
   error_message: string | null;
   snoozed_from_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Note = {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  color: NoteColor;
+  is_pinned: boolean;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinanceTransaction = {
+  id: string;
+  user_id: string;
+  transaction_type: TransactionType;
+  amount: number;
+  category: string;
+  description: string | null;
+  transaction_date: string;
+  currency: string;
   created_at: string;
   updated_at: string;
 };

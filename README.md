@@ -15,6 +15,8 @@ The project demonstrates full-stack product engineering across authentication, a
 ## Product Highlights
 
 - Full task lifecycle: create, edit, complete, archive, delete, snooze, search, and filter
+- Searchable personal notes with pinning, colors, editing, and archiving
+- Daily income and expense tracking with monthly summaries and category breakdowns
 - One-time and recurring reminders with timezone-aware scheduling
 - Automated Telegram delivery through Supabase Cron and Edge Functions
 - Secure Telegram account linking without asking users for chat IDs
@@ -186,6 +188,12 @@ The migration creates:
 - constraints and indexes
 - RLS policies
 - the atomic `claim_due_notifications` function
+
+Run all migrations in order, including:
+
+```text
+supabase/migrations/0002_notes_and_finance.sql
+```
 
 ## Telegram Setup
 

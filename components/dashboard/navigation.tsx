@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, CalendarDays, Home, ListChecks, MessageCircle, Shield, Settings } from "lucide-react";
+import { Bell, CalendarDays, Home, ListChecks, MessageCircle, NotebookPen, Shield, Settings, WalletCards } from "lucide-react";
 import { AppLogo } from "@/components/app-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { logoutAction } from "@/lib/actions/auth";
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/dashboard/reminders", label: "Reminders", icon: ListChecks },
+  { href: "/dashboard/notes", label: "Notes", icon: NotebookPen },
+  { href: "/dashboard/finance", label: "Finance", icon: WalletCards },
   { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
   { href: "/dashboard/telegram", label: "Telegram", icon: MessageCircle },
@@ -35,7 +37,13 @@ export function Sidebar({ userName, isAdmin = false }: { userName: string; isAdm
 }
 
 export function MobileNavigation({ isAdmin = false }: { isAdmin?: boolean }) {
-  const items = isAdmin ? [{ href: "/admin", label: "Admin", icon: Shield }, ...nav.slice(0, 4)] : nav.slice(0, 5);
+  const items = [
+    { href: "/dashboard", label: "Home", icon: Home },
+    { href: "/dashboard/reminders", label: "Tasks", icon: ListChecks },
+    { href: "/dashboard/notes", label: "Notes", icon: NotebookPen },
+    { href: "/dashboard/finance", label: "Finance", icon: WalletCards },
+    { href: isAdmin ? "/admin" : "/dashboard/settings", label: isAdmin ? "Admin" : "Settings", icon: isAdmin ? Shield : Settings }
+  ];
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 border-t bg-card p-2 lg:hidden">
       {items.map(({ href, label, icon: Icon }) => (
