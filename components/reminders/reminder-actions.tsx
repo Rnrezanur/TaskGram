@@ -39,9 +39,9 @@ export function ReminderActions({ reminderId, status }: { reminderId: string; st
   }
 
   return (
-    <div className="mt-4 flex flex-wrap gap-2">
+    <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
       {localStatus === "completed" ? (
-        <Button size="sm" variant="secondary" disabled>
+        <Button size="sm" variant="secondary" disabled className="w-full sm:w-auto">
           <Check className="h-4 w-4" />
           Completed
         </Button>
@@ -49,6 +49,7 @@ export function ReminderActions({ reminderId, status }: { reminderId: string; st
         <Button
           size="sm"
           variant="secondary"
+          className="w-full sm:w-auto"
           disabled={pendingAction !== null || localStatus !== "active"}
           onClick={() => runAction("complete", () => completeReminderAction(reminderId))}
         >
@@ -56,7 +57,7 @@ export function ReminderActions({ reminderId, status }: { reminderId: string; st
           {pendingAction === "complete" ? "Completing..." : "Complete"}
         </Button>
       )}
-      <Button asChild size="sm" variant="outline">
+      <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
         <Link href={`/dashboard/reminders/${reminderId}/edit`}>
           <Pencil className="h-4 w-4" />
           Edit
@@ -66,6 +67,7 @@ export function ReminderActions({ reminderId, status }: { reminderId: string; st
         <Button
           size="sm"
           variant="outline"
+          className="w-full sm:w-auto"
           disabled={pendingAction !== null}
           onClick={() => runAction("archive", () => archiveReminderAction(reminderId))}
         >
@@ -76,6 +78,7 @@ export function ReminderActions({ reminderId, status }: { reminderId: string; st
       <Button
         size="sm"
         variant="destructive"
+        className="w-full sm:w-auto"
         disabled={pendingAction !== null}
         onClick={() => runAction("delete", () => deleteReminderAction(reminderId))}
       >

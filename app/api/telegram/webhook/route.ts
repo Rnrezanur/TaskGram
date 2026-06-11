@@ -73,27 +73,59 @@ export async function POST(request: NextRequest) {
   try {
     if (update.callback_query?.data) {
       const chatId = update.callback_query.message?.chat.id ?? update.callback_query.from.id;
-      const [action, reminderId] = update.callback_query.data.split(":");
+      const [action, targetId] = update.callback_query.data.split(":");
       const { data: connection } = await supabase.from("telegram_connections").select("user_id").eq("telegram_chat_id", chatId).eq("is_active", true).maybeSingle();
       if (!connection) {
         await answerCallback(update.callback_query.id, "Telegram is not connected to TaskGram.");
         return NextResponse.json({ ok: true });
       }
-      if (action === "complete") {
-        const { data: reminder } = await supabase.from("reminders").select("status").eq("id", reminderId).eq("user_id", connection.user_id).maybeSingle();
+      if (action === "complete" || action === "complete_delivery") {
+        let reminderId = targetId;
+        let occurrenceDueAt: string | null = null;
+        if (action === "complete_delivery") {
+          const { data: delivery } = await supabase
+            .from("notification_deliveries")
+            .select("reminder_id,scheduled_for")
+            .eq("id", targetId)
+            .eq("user_id", connection.user_id)
+            .maybeSingle();
+          if (!delivery) {
+            await answerCallback(update.callback_query.id, "This reminder notification is unavailable.");
+            return NextResponse.json({ ok: true });
+          }
+          reminderId = delivery.reminder_id;
+          const { data: reminderTiming } = await supabase.from("reminders").select("reminder_minutes_before").eq("id", reminderId).eq("user_id", connection.user_id).maybeSingle();
+          occurrenceDueAt = new Date(new Date(delivery.scheduled_for).getTime() + (reminderTiming?.reminder_minutes_before ?? 0) * 60_000).toISOString();
+        }
+        const { data: reminder } = await supabase.from("reminders").select("status,recurrence_type,due_at").eq("id", reminderId).eq("user_id", connection.user_id).maybeSingle();
         if (!reminder || reminder.status === "completed") {
           await answerCallback(update.callback_query.id, "This reminder is already completed or unavailable.");
           return NextResponse.json({ ok: true });
         }
-        await supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", reminderId).eq("user_id", connection.user_id);
-        await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", reminderId).eq("delivery_status", "pending");
+        let occurrenceQuery = supabase
+          .from("task_occurrences")
+          .select("id")
+          .eq("reminder_id", reminderId)
+          .eq("user_id", connection.user_id)
+          .eq("status", "pending");
+        occurrenceQuery = occurrenceDueAt
+          ? occurrenceQuery.eq("due_at", occurrenceDueAt)
+          : occurrenceQuery.lte("due_at", new Date().toISOString()).order("due_at", { ascending: false }).limit(1);
+        const { data: occurrence } = await occurrenceQuery.maybeSingle();
+        if (occurrence) {
+          await supabase.from("task_occurrences").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", occurrence.id).eq("user_id", connection.user_id);
+        }
+        if (reminder.recurrence_type === "none") {
+          await supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", reminderId).eq("user_id", connection.user_id);
+          await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", reminderId).eq("delivery_status", "pending");
+        }
         await answerCallback(update.callback_query.id, "Marked complete.");
         if (update.callback_query.message?.message_id) {
           await editTelegramMessage(chatId, update.callback_query.message.message_id, `${update.callback_query.message.text ?? "TaskGram reminder"}\n\nCompleted in TaskGram.`);
         }
       }
       if (action === "snooze10") {
-        await supabase.from("notification_deliveries").insert({ reminder_id: reminderId, user_id: connection.user_id, scheduled_for: new Date(Date.now() + 10 * 60_000).toISOString(), delivery_status: "pending" });
+        await supabase.from("notification_deliveries").insert({ reminder_id: targetId, user_id: connection.user_id, scheduled_for: new Date(Date.now() + 10 * 60_000).toISOString(), delivery_status: "pending" });
         await answerCallback(update.callback_query.id, "Snoozed for 10 minutes.");
       }
       return NextResponse.json({ ok: true });

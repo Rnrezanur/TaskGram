@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     monthStart.setDate(1);
     const monthDate = monthStart.toISOString().slice(0, 10);
 
-    const [profileResult, tasksResult, notesResult, financeResult] = await Promise.all([
+    const [profileResult, tasksResult, notesResult, financeResult, recordsResult] = await Promise.all([
       supabase.from("profiles").select("full_name,timezone").eq("id", userId).single(),
       supabase
         .from("reminders")
@@ -83,17 +83,26 @@ export async function GET(request: NextRequest) {
         .gte("transaction_date", monthDate)
         .order("transaction_date", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(50)
+        .limit(50),
+      supabase
+        .from("task_occurrences")
+        .select("id,reminder_id,due_at,status,completed_at,reminders(title,category)")
+        .eq("user_id", userId)
+        .gte("due_at", monthStart.toISOString())
+        .order("due_at", { ascending: false })
+        .limit(60)
     ]);
 
-    const firstError = profileResult.error || tasksResult.error || notesResult.error || financeResult.error;
+    const firstError = profileResult.error || tasksResult.error || notesResult.error || financeResult.error || recordsResult.error;
     if (firstError) throw firstError;
 
     return NextResponse.json({
       profile: profileResult.data,
       tasks: tasksResult.data ?? [],
       notes: notesResult.data ?? [],
-      transactions: financeResult.data ?? []
+      transactions: financeResult.data ?? [],
+      records: recordsResult.data ?? [],
+      generatedAt: new Date().toISOString()
     });
   } catch (error) {
     return responseError(error, 401);
@@ -117,6 +126,12 @@ export async function POST(request: NextRequest) {
       if (!reminder) return responseError(new Error("Task not found."), 404);
 
       if (data.action === "complete") {
+        await supabase
+          .from("task_occurrences")
+          .update({ status: "completed", completed_at: new Date().toISOString() })
+          .eq("reminder_id", data.id)
+          .eq("user_id", userId)
+          .eq("due_at", reminder.due_at);
         if (reminder.recurrence_type === "none") {
           await Promise.all([
             supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", userId),

@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive,
+  BarChart3,
   Check,
   CircleDollarSign,
   Clock3,
@@ -23,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-type Tab = "tasks" | "notes" | "money";
+type Tab = "tasks" | "notes" | "money" | "records";
 type Task = {
   id: string;
   title: string;
@@ -50,11 +51,20 @@ type Transaction = {
   transaction_date: string;
   currency: string;
 };
+type TaskRecord = {
+  id: string;
+  reminder_id: string;
+  due_at: string;
+  status: "pending" | "completed" | "cancelled";
+  reminders: { title: string; category: string } | null;
+};
 type WorkspaceData = {
   profile: { full_name: string | null; timezone: string };
   tasks: Task[];
   notes: Note[];
   transactions: Transaction[];
+  records: TaskRecord[];
+  generatedAt: string;
 };
 
 function futureParts() {
@@ -177,6 +187,12 @@ export function TelegramWorkspace() {
     (sum, item) => ({ ...sum, [item.transaction_type]: sum[item.transaction_type] + Number(item.amount) }),
     { income: 0, expense: 0 }
   ) ?? { income: 0, expense: 0 }, [data]);
+  const recordTotals = useMemo(() => data?.records.reduce((sum, record) => {
+    if (record.status === "cancelled") return sum;
+    const status = record.status === "completed" ? "completed" : new Date(record.due_at).getTime() < new Date(data.generatedAt).getTime() ? "incomplete" : "pending";
+    sum[status] += 1;
+    return sum;
+  }, { completed: 0, incomplete: 0, pending: 0 }) ?? { completed: 0, incomplete: 0, pending: 0 }, [data]);
 
   if (loading) {
     return <div className="flex min-h-[75vh] items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
@@ -195,11 +211,12 @@ export function TelegramWorkspace() {
 
       {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
 
-      <nav className="grid grid-cols-3 gap-1 rounded-lg border bg-muted p-1">
+      <nav className="grid grid-cols-4 gap-1 rounded-lg border bg-muted p-1">
         {([
           ["tasks", ListTodo, "Tasks"],
           ["notes", NotebookPen, "Notes"],
-          ["money", CircleDollarSign, "Money"]
+          ["money", CircleDollarSign, "Money"],
+          ["records", BarChart3, "Records"]
         ] as const).map(([value, Icon, label]) => (
           <button key={value} onClick={() => setTab(value)} className={cn("flex h-11 items-center justify-center gap-2 rounded-md text-sm font-medium", tab === value ? "bg-background text-primary shadow-sm" : "text-muted-foreground")}>
             <Icon className="h-4 w-4" />{label}
@@ -294,6 +311,27 @@ export function TelegramWorkspace() {
           )) : <Empty>This month has no transactions yet.</Empty>}
         </section>
       )}
+
+      {tab === "records" && (
+        <section className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <MiniRecordStat label="Done" value={recordTotals.completed} color="text-emerald-600" />
+            <MiniRecordStat label="Incomplete" value={recordTotals.incomplete} color="text-red-600" />
+            <MiniRecordStat label="Pending" value={recordTotals.pending} color="text-sky-600" />
+          </div>
+          <p className="text-xs font-medium uppercase text-muted-foreground">This month</p>
+          {data?.records.filter((record) => record.status !== "cancelled").length ? data.records.filter((record) => record.status !== "cancelled").map((record) => {
+            const status = record.status === "completed" ? "completed" : new Date(record.due_at).getTime() < new Date(data.generatedAt).getTime() ? "incomplete" : "pending";
+            return (
+              <Card key={record.id}><CardContent className="flex items-center gap-3 p-4">
+                <div className={cn("h-2.5 w-2.5 shrink-0 rounded-full", status === "completed" ? "bg-emerald-500" : status === "incomplete" ? "bg-red-500" : "bg-sky-500")} />
+                <div className="min-w-0 flex-1"><p className="truncate font-medium">{record.reminders?.title ?? "Task"}</p><p className="text-xs text-muted-foreground">{new Date(record.due_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p></div>
+                <span className="text-xs font-medium capitalize text-muted-foreground">{status}</span>
+              </CardContent></Card>
+            );
+          }) : <Empty>No task records this month.</Empty>}
+        </section>
+      )}
     </div>
   );
 }
@@ -312,4 +350,8 @@ function ActionButton({ label, icon: Icon, destructive, ...props }: React.Button
 
 function Summary({ label, value, icon: Icon, color }: { label: string; value: number; icon: typeof CircleDollarSign; color: string }) {
   return <Card><CardContent className="p-4"><Icon className={cn("h-5 w-5", color)} /><p className="mt-3 text-xs text-muted-foreground">{label} this month</p><p className={cn("mt-1 text-lg font-bold", color)}>{value.toLocaleString()} BDT</p></CardContent></Card>;
+}
+
+function MiniRecordStat({ label, value, color }: { label: string; value: number; color: string }) {
+  return <Card><CardContent className="p-3 text-center"><p className={cn("text-xl font-bold", color)}>{value}</p><p className="mt-1 text-[10px] text-muted-foreground">{label}</p></CardContent></Card>;
 }

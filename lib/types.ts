@@ -4,6 +4,7 @@ export type Priority = "low" | "medium" | "high";
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "custom_days" | "custom_weeks";
 export type NoteColor = "default" | "blue" | "green" | "amber" | "rose";
 export type TransactionType = "income" | "expense";
+export type TaskOccurrenceStatus = "pending" | "completed" | "cancelled";
 
 export type Profile = {
   id: string;
@@ -65,6 +66,18 @@ export type NotificationDelivery = {
   snoozed_from_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type TaskOccurrence = {
+  id: string;
+  reminder_id: string;
+  user_id: string;
+  due_at: string;
+  status: TaskOccurrenceStatus;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  reminders?: Pick<Reminder, "title" | "priority" | "category" | "timezone" | "recurrence_type"> | null;
 };
 
 export type Note = {

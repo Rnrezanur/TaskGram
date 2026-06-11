@@ -15,13 +15,14 @@ The project demonstrates full-stack product engineering across authentication, a
 ## Product Highlights
 
 - Full task lifecycle: create, edit, complete, archive, delete, snooze, search, and filter
+- Daily and monthly task records with completed, incomplete, pending, and completion-rate insights
 - Searchable personal notes with pinning, colors, editing, and archiving
 - Daily income and expense tracking with monthly summaries and category breakdowns
 - One-time and recurring reminders with timezone-aware scheduling
 - Automated Telegram delivery through Supabase Cron and Edge Functions
 - Secure Telegram account linking without asking users for chat IDs
 - Telegram inline actions for completing and snoozing reminders
-- Telegram Mini App with a mobile task-creation interface
+- Telegram Mini App workspace for tasks, records, notes, income, and expenses
 - Delivery history with pending, processing, sent, failed, and cancelled states
 - Responsive dashboard, calendar view, settings, dark mode, and admin dashboard
 - Per-user data isolation through PostgreSQL Row Level Security
@@ -38,6 +39,10 @@ pending -> processing -> sent
 ```
 
 This design prevents duplicate delivery during overlapping Cron executions and supports up to three retry attempts for temporary failures.
+
+### Accurate Task History
+
+Each scheduled task occurrence has its own history record. Recurring reminders can move to their next due date without overwriting earlier completed or incomplete work, enabling accurate daily and monthly progress reporting.
 
 ### Secure Telegram Linking
 

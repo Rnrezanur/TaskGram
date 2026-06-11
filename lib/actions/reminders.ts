@@ -123,6 +123,12 @@ export async function completeReminderAction(id: string) {
     .eq("user_id", user.id)
     .single<Reminder>();
   if (!data) return;
+  await supabase
+    .from("task_occurrences")
+    .update({ status: "completed", completed_at: new Date().toISOString() })
+    .eq("reminder_id", id)
+    .eq("user_id", user.id)
+    .eq("due_at", data.due_at);
   if (data.recurrence_type === "none") {
     await Promise.all([
       supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id),
