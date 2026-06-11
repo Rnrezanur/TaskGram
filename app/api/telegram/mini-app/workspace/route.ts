@@ -25,6 +25,14 @@ const mutationSchema = z.union([
   z.object({
     resource: z.literal("note"),
     id: z.string().uuid(),
+    action: z.literal("update"),
+    title: z.string(),
+    content: z.string().optional().default(""),
+    color: z.string().optional().default("default")
+  }),
+  z.object({
+    resource: z.literal("note"),
+    id: z.string().uuid(),
     action: z.enum(["pin", "archive", "delete"]),
     value: z.boolean().optional()
   }),
@@ -172,10 +180,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (data.resource === "note" && data.action === "create") {
+    if (data.resource === "note" && (data.action === "create" || data.action === "update")) {
       const note = noteSchema.safeParse(data);
       if (!note.success) return responseError(new Error(note.error.issues[0]?.message ?? "Invalid note."), 400);
-      const { error } = await supabase.from("notes").insert({ user_id: userId, ...note.data });
+      const { error } = data.action === "create"
+        ? await supabase.from("notes").insert({ user_id: userId, ...note.data })
+        : await supabase.from("notes").update(note.data).eq("id", data.id).eq("user_id", userId);
       if (error) throw error;
     } else if (data.resource === "note") {
       if (data.action === "delete") {

@@ -11,6 +11,7 @@ import {
   ListTodo,
   Loader2,
   NotebookPen,
+  Pencil,
   Pin,
   Plus,
   RefreshCw,
@@ -93,6 +94,7 @@ export function TelegramWorkspace() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
   const defaults = useMemo(() => futureParts(), []);
 
   const api = useCallback(async (url: string, options?: RequestInit) => {
@@ -144,9 +146,11 @@ export function TelegramWorkspace() {
       await api("/api/telegram/mini-app/workspace", { method: "POST", body: JSON.stringify(payload) });
       window.Telegram?.WebApp.HapticFeedback?.notificationOccurred("success");
       await refresh();
+      return true;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Action failed.");
       window.Telegram?.WebApp.HapticFeedback?.notificationOccurred("error");
+      return false;
     } finally {
       setBusy("");
     }
@@ -175,8 +179,20 @@ export function TelegramWorkspace() {
   async function submitNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
-    await mutate("new-note", { resource: "note", action: "create", ...Object.fromEntries(new FormData(form)) });
-    form.reset();
+    const saved = await mutate("new-note", { resource: "note", action: "create", ...Object.fromEntries(new FormData(form)) });
+    if (saved) form.reset();
+  }
+
+  async function updateNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingNote) return;
+    const saved = await mutate(`edit-${editingNote.id}`, {
+      resource: "note",
+      action: "update",
+      id: editingNote.id,
+      ...Object.fromEntries(new FormData(event.currentTarget))
+    });
+    if (saved) setEditingNote(null);
   }
 
   async function submitTransaction(event: FormEvent<HTMLFormElement>) {
@@ -266,6 +282,21 @@ export function TelegramWorkspace() {
 
       {tab === "notes" && (
         <section className="space-y-3">
+          {editingNote && (
+            <Card className="border-primary/40"><CardContent className="p-4"><form onSubmit={updateNote} className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-semibold">Edit note</h2>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditingNote(null)}>Cancel</Button>
+              </div>
+              <Field label="Note title"><Input name="title" required autoFocus defaultValue={editingNote.title} /></Field>
+              <Field label="Note content"><Textarea name="content" defaultValue={editingNote.content} className="min-h-24" /></Field>
+              <input type="hidden" name="color" value={editingNote.color || "default"} />
+              <Button className="w-full" disabled={busy === `edit-${editingNote.id}`}>
+                {busy === `edit-${editingNote.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                Save changes
+              </Button>
+            </form></CardContent></Card>
+          )}
           <Card><CardContent className="p-4"><form onSubmit={submitNote} className="space-y-3">
             <Field label="New note"><Input name="title" required placeholder="Note title" /></Field>
             <Textarea name="content" placeholder="Write anything you want to remember..." className="min-h-20" />
@@ -276,7 +307,8 @@ export function TelegramWorkspace() {
             <Card key={note.id}><CardContent className="space-y-3 p-4">
               <div className="flex items-start justify-between gap-2"><h2 className="font-semibold">{note.title}</h2>{note.is_pinned && <Pin className="h-4 w-4 text-primary" />}</div>
               {note.content && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{note.content}</p>}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <ActionButton label="Edit" icon={Pencil} onClick={() => setEditingNote(note)} disabled={busy === note.id} />
                 <ActionButton label={note.is_pinned ? "Unpin" : "Pin"} icon={Pin} onClick={() => mutate(note.id, { resource: "note", id: note.id, action: "pin", value: !note.is_pinned })} disabled={busy === note.id} />
                 <ActionButton label="Archive" icon={Archive} onClick={() => mutate(note.id, { resource: "note", id: note.id, action: "archive", value: true })} disabled={busy === note.id} />
                 <ActionButton label="Delete" icon={Trash2} destructive onClick={() => confirm("Delete this note?") && mutate(note.id, { resource: "note", id: note.id, action: "delete" })} disabled={busy === note.id} />
