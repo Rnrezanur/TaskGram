@@ -89,6 +89,7 @@ export async function updateReminderAction(id: string, _: unknown, formData: For
   if (parsed.data.telegramEnabled && !(await telegramConnected(user.id))) return { error: "Connect Telegram before enabling Telegram reminders." };
   const dueAt = zonedDateTimeToUtc(parsed.data.date, parsed.data.time, parsed.data.timezone);
   if (!parsed.data.allowPast && dueAt.getTime() < Date.now()) return { error: "Reminder cannot be scheduled in the past." };
+  const { data: previous } = await supabase.from("reminders").select("due_at").eq("id", id).eq("user_id", user.id).maybeSingle();
   const { error } = await supabase
     .from("reminders")
     .update({
@@ -108,6 +109,9 @@ export async function updateReminderAction(id: string, _: unknown, formData: For
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) return { error: error.message };
+  if (previous?.due_at && previous.due_at !== dueAt.toISOString()) {
+    await supabase.from("task_occurrences").update({ status: "cancelled" }).eq("reminder_id", id).eq("user_id", user.id).eq("due_at", previous.due_at).eq("status", "pending");
+  }
   await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", id).eq("delivery_status", "pending");
   await supabase.from("notification_deliveries").insert(buildInitialDelivery(id, user.id, dueAt, parsed.data.reminderMinutesBefore));
   revalidatePath("/dashboard");
@@ -123,18 +127,30 @@ export async function completeReminderAction(id: string) {
     .eq("user_id", user.id)
     .single<Reminder>();
   if (!data) return;
+  const { data: dueOccurrence } = await supabase
+    .from("task_occurrences")
+    .select("id,due_at")
+    .eq("reminder_id", id)
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .lte("due_at", new Date().toISOString())
+    .order("due_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const occurrenceDueAt = dueOccurrence?.due_at ?? data.due_at;
+  const resolvingCurrentOccurrence = new Date(occurrenceDueAt).getTime() === new Date(data.due_at).getTime();
   await supabase
     .from("task_occurrences")
     .update({ status: "completed", completed_at: new Date().toISOString() })
     .eq("reminder_id", id)
     .eq("user_id", user.id)
-    .eq("due_at", data.due_at);
+    .eq("due_at", occurrenceDueAt);
   if (data.recurrence_type === "none") {
     await Promise.all([
       supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id),
       supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", id).eq("delivery_status", "pending")
     ]);
-  } else {
+  } else if (resolvingCurrentOccurrence) {
     const next = nextRecurringDelivery(data);
     if (next) {
       await supabase.from("reminders").update({ due_at: next.dueAt.toISOString(), next_occurrence_at: next.dueAt.toISOString() }).eq("id", id).eq("user_id", user.id);
@@ -155,18 +171,32 @@ export async function markReminderIncompleteAction(id: string) {
     .eq("user_id", user.id)
     .single<Reminder>();
   if (!data) return;
+  const { data: dueOccurrence } = await supabase
+    .from("task_occurrences")
+    .select("id,due_at")
+    .eq("reminder_id", id)
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .lte("due_at", new Date().toISOString())
+    .order("due_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const occurrenceDueAt = dueOccurrence?.due_at ?? data.due_at;
+  const resolvingCurrentOccurrence = new Date(occurrenceDueAt).getTime() === new Date(data.due_at).getTime();
 
   await supabase
     .from("task_occurrences")
     .update({ status: "incomplete", completed_at: null })
     .eq("reminder_id", id)
     .eq("user_id", user.id)
-    .eq("due_at", data.due_at);
+    .eq("due_at", occurrenceDueAt);
 
-  await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", id).eq("delivery_status", "pending");
+  if (data.recurrence_type === "none" || resolvingCurrentOccurrence) {
+    await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", id).eq("delivery_status", "pending");
+  }
   if (data.recurrence_type === "none") {
     await supabase.from("reminders").update({ status: "cancelled" }).eq("id", id).eq("user_id", user.id);
-  } else {
+  } else if (resolvingCurrentOccurrence) {
     const next = nextRecurringDelivery(data);
     if (next) {
       await supabase.from("reminders").update({ due_at: next.dueAt.toISOString(), next_occurrence_at: next.dueAt.toISOString() }).eq("id", id).eq("user_id", user.id);

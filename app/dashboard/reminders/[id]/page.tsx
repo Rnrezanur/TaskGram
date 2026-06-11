@@ -14,7 +14,7 @@ export default async function ReminderDetailsPage({ params }: { params: Promise<
   const [reminderResult, deliveriesResult, occurrencesResult] = await Promise.all([
     supabase.from("reminders").select("*").eq("id", id).eq("user_id", user!.id).maybeSingle<Reminder>(),
     supabase.from("notification_deliveries").select("id,reminder_id,user_id,scheduled_for,sent_at,delivery_status,attempt_count,telegram_message_id,error_message,snoozed_from_id,created_at,updated_at").eq("reminder_id", id).eq("user_id", user!.id).order("scheduled_for", { ascending: false }).returns<NotificationDelivery[]>(),
-    supabase.from("task_occurrences").select("id,reminder_id,user_id,due_at,status,completed_at,created_at,updated_at").eq("reminder_id", id).eq("user_id", user!.id).order("due_at", { ascending: false }).returns<TaskOccurrence[]>()
+    supabase.from("task_occurrences").select("id,reminder_id,user_id,due_at,status,completed_at,title,category,priority,timezone,recurrence_type,created_at,updated_at").eq("reminder_id", id).eq("user_id", user!.id).order("due_at", { ascending: false }).returns<TaskOccurrence[]>()
   ]);
   const reminder = reminderResult.data;
   if (!reminder) notFound();

@@ -70,14 +70,20 @@ export type NotificationDelivery = {
 
 export type TaskOccurrence = {
   id: string;
-  reminder_id: string;
+  reminder_id: string | null;
   user_id: string;
   due_at: string;
   status: TaskOccurrenceStatus;
   completed_at: string | null;
+  title: string;
+  description: string | null;
+  category: string;
+  custom_category: string | null;
+  priority: Priority;
+  timezone: string;
+  recurrence_type: RecurrenceType;
   created_at: string;
   updated_at: string;
-  reminders?: Pick<Reminder, "title" | "priority" | "category" | "timezone" | "recurrence_type"> | null;
 };
 
 export type Note = {

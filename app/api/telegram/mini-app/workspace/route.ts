@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         .limit(50),
       supabase
         .from("task_occurrences")
-        .select("id,reminder_id,due_at,status,completed_at,reminders(title,category)")
+        .select("id,reminder_id,due_at,status,completed_at,title,category")
         .eq("user_id", userId)
         .gte("due_at", monthStart.toISOString())
         .order("due_at", { ascending: false })
@@ -127,18 +127,30 @@ export async function POST(request: NextRequest) {
 
       if (data.action === "complete" || data.action === "incomplete") {
         const occurrenceStatus = data.action === "complete" ? "completed" : "incomplete";
+        const { data: dueOccurrence } = await supabase
+          .from("task_occurrences")
+          .select("id,due_at")
+          .eq("reminder_id", data.id)
+          .eq("user_id", userId)
+          .eq("status", "pending")
+          .lte("due_at", new Date().toISOString())
+          .order("due_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const occurrenceDueAt = dueOccurrence?.due_at ?? reminder.due_at;
+        const resolvingCurrentOccurrence = new Date(occurrenceDueAt).getTime() === new Date(reminder.due_at).getTime();
         await supabase
           .from("task_occurrences")
           .update({ status: occurrenceStatus, completed_at: data.action === "complete" ? new Date().toISOString() : null })
           .eq("reminder_id", data.id)
           .eq("user_id", userId)
-          .eq("due_at", reminder.due_at);
+          .eq("due_at", occurrenceDueAt);
         if (reminder.recurrence_type === "none") {
           await Promise.all([
             supabase.from("reminders").update(data.action === "complete" ? { status: "completed", completed_at: new Date().toISOString() } : { status: "cancelled" }).eq("id", data.id).eq("user_id", userId),
             supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", data.id).eq("delivery_status", "pending")
           ]);
-        } else {
+        } else if (resolvingCurrentOccurrence) {
           const next = nextRecurringDelivery(reminder);
           if (next) {
             await supabase.from("reminders").update({ due_at: next.dueAt.toISOString(), next_occurrence_at: next.dueAt.toISOString() }).eq("id", data.id).eq("user_id", userId);

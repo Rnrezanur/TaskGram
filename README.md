@@ -45,6 +45,7 @@ This design prevents duplicate delivery during overlapping Cron executions and s
 ### Accurate Task History
 
 Each scheduled task occurrence has its own history record. Recurring reminders can move to their next due date without overwriting earlier completed or incomplete work, enabling accurate daily and monthly progress reporting.
+Task records preserve their original title, details, category, priority, timezone, recurrence type, and result even after the source task is edited or deleted.
 
 ### Secure Telegram Linking
 

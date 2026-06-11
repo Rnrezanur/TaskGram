@@ -12,17 +12,17 @@ import { createClient } from "@/lib/supabase/server";
 
 type RecordRow = {
   id: string;
-  reminder_id: string;
+  reminder_id: string | null;
   due_at: string;
   status: "pending" | "completed" | "incomplete" | "cancelled";
   completed_at: string | null;
-  reminders: {
-    title: string;
-    priority: string;
-    category: string;
-    timezone: string;
-    recurrence_type: string;
-  } | null;
+  title: string;
+  description: string | null;
+  priority: string;
+  category: string;
+  custom_category: string | null;
+  timezone: string;
+  recurrence_type: string;
 };
 
 type RecordView = "day" | "month" | "range";
@@ -70,7 +70,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
 
   const { data } = await supabase
     .from("task_occurrences")
-    .select("id,reminder_id,due_at,status,completed_at,reminders(title,priority,category,timezone,recurrence_type)")
+    .select("id,reminder_id,due_at,status,completed_at,title,description,priority,category,custom_category,timezone,recurrence_type")
     .eq("user_id", user!.id)
     .gte("due_at", start.toISOString())
     .lt("due_at", end.toISOString())
@@ -154,12 +154,15 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
                 {dayRecords?.map((record) => {
                   const status = taskRecordStatus(record, now) as Exclude<DisplayTaskStatus, "cancelled">;
                   return (
-                    <Link key={record.id} href={`/dashboard/reminders/${record.reminder_id}`} className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
+                    <div key={record.id} className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold">{record.reminders?.title ?? "Deleted task"}</p>
+                        {record.reminder_id ? <Link href={`/dashboard/reminders/${record.reminder_id}`} className="truncate font-semibold hover:text-primary">{record.title}</Link> : <p className="truncate font-semibold">{record.title}</p>}
+                        {record.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{record.description}</p>}
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {formatInTimeZone(record.due_at, timezone, "h:mm a")} / {record.reminders?.category ?? "task"}
-                          {record.reminders?.recurrence_type !== "none" ? " / recurring" : ""}
+                          {formatInTimeZone(record.due_at, timezone, "h:mm a")} / {record.custom_category || record.category} / {record.priority} priority
+                          {record.recurrence_type !== "none" ? " / recurring" : ""}
+                          {record.timezone !== timezone ? ` / ${record.timezone}` : ""}
+                          {!record.reminder_id ? " / deleted task" : ""}
                         </p>
                         {status === "completed" && record.completed_at && (
                           <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
@@ -168,7 +171,7 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
                         )}
                       </div>
                       <Badge className={statusStyle(status)}>{status}</Badge>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
