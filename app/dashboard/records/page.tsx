@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { taskRecordStatus, taskRecordSummary, type DisplayTaskStatus } from "@/lib/reminders/records";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,7 +14,7 @@ type RecordRow = {
   id: string;
   reminder_id: string;
   due_at: string;
-  status: "pending" | "completed" | "cancelled";
+  status: "pending" | "completed" | "incomplete" | "cancelled";
   completed_at: string | null;
   reminders: {
     title: string;
@@ -24,7 +25,15 @@ type RecordRow = {
   } | null;
 };
 
-function rangeFor(view: "day" | "month", selected: string, timezone: string) {
+type RecordView = "day" | "month" | "range";
+
+function rangeFor(view: RecordView, selected: string, timezone: string, from: string, to: string) {
+  if (view === "range") {
+    return {
+      start: fromZonedTime(`${from}T00:00:00`, timezone),
+      end: addDays(fromZonedTime(`${to}T00:00:00`, timezone), 1)
+    };
+  }
   if (view === "day") {
     const start = fromZonedTime(`${selected}T00:00:00`, timezone);
     return { start, end: addDays(start, 1) };
@@ -33,7 +42,7 @@ function rangeFor(view: "day" | "month", selected: string, timezone: string) {
   return { start, end: addMonths(start, 1) };
 }
 
-function moveSelection(view: "day" | "month", selected: string, amount: number) {
+function moveSelection(view: Exclude<RecordView, "range">, selected: string, amount: number) {
   const parsed = new Date(`${view === "day" ? selected : `${selected}-01`}T12:00:00`);
   return format(view === "day" ? addDays(parsed, amount) : addMonths(parsed, amount), view === "day" ? "yyyy-MM-dd" : "yyyy-MM");
 }
@@ -44,16 +53,20 @@ function statusStyle(status: Exclude<DisplayTaskStatus, "cancelled">) {
   return "border-sky-300 bg-sky-500/10 text-sky-700 dark:text-sky-300";
 }
 
-export default async function RecordsPage({ searchParams }: { searchParams: Promise<{ view?: string; date?: string }> }) {
+export default async function RecordsPage({ searchParams }: { searchParams: Promise<{ view?: string; date?: string; from?: string; to?: string }> }) {
   const params = await searchParams;
-  const view = params.view === "day" ? "day" : "month";
+  const view: RecordView = params.view === "day" || params.view === "range" ? params.view : "month";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("timezone").eq("id", user!.id).single();
   const timezone = profile?.timezone ?? "Asia/Dhaka";
-  const fallbackDate = formatInTimeZone(new Date(), timezone, view === "day" ? "yyyy-MM-dd" : "yyyy-MM");
+  const todayDate = formatInTimeZone(new Date(), timezone, "yyyy-MM-dd");
+  const fallbackDate = view === "day" ? todayDate : formatInTimeZone(new Date(), timezone, "yyyy-MM");
   const selected = params.date?.match(view === "day" ? /^\d{4}-\d{2}-\d{2}$/ : /^\d{4}-\d{2}$/)?.[0] ?? fallbackDate;
-  const { start, end } = rangeFor(view, selected, timezone);
+  const rawFrom = params.from?.match(/^\d{4}-\d{2}-\d{2}$/)?.[0] ?? todayDate;
+  const rawTo = params.to?.match(/^\d{4}-\d{2}-\d{2}$/)?.[0] ?? rawFrom;
+  const [from, to] = rawFrom <= rawTo ? [rawFrom, rawTo] : [rawTo, rawFrom];
+  const { start, end } = rangeFor(view, selected, timezone, from, to);
 
   const { data } = await supabase
     .from("task_occurrences")
@@ -72,7 +85,11 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
   const groups = Object.groupBy(visible, (record) => formatInTimeZone(record.due_at, timezone, "yyyy-MM-dd"));
   const title = view === "day"
     ? formatInTimeZone(start, timezone, "EEEE, d MMMM yyyy")
-    : formatInTimeZone(start, timezone, "MMMM yyyy");
+    : view === "month"
+      ? formatInTimeZone(start, timezone, "MMMM yyyy")
+      : from === to
+        ? formatInTimeZone(start, timezone, "d MMMM yyyy")
+        : `${formatInTimeZone(start, timezone, "d MMM yyyy")} to ${formatInTimeZone(addDays(end, -1), timezone, "d MMM yyyy")}`;
 
   return (
     <div className="space-y-5">
@@ -88,16 +105,25 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
       </header>
 
       <section className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-        <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-1">
+        <div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1">
           <Link href={`/dashboard/records?view=day&date=${formatInTimeZone(new Date(), timezone, "yyyy-MM-dd")}`} className={`rounded px-4 py-2 text-center text-sm font-medium ${view === "day" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>Daily</Link>
           <Link href={`/dashboard/records?view=month&date=${formatInTimeZone(new Date(), timezone, "yyyy-MM")}`} className={`rounded px-4 py-2 text-center text-sm font-medium ${view === "month" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>Monthly</Link>
+          <Link href={`/dashboard/records?view=range&from=${todayDate}&to=${todayDate}`} className={`rounded px-3 py-2 text-center text-sm font-medium ${view === "range" ? "bg-background text-primary shadow-sm" : "text-muted-foreground"}`}>Custom</Link>
         </div>
-        <div className="grid grid-cols-[40px_1fr_40px] items-center gap-2">
-          <Button asChild variant="outline" size="icon"><Link aria-label="Previous period" href={`/dashboard/records?view=${view}&date=${moveSelection(view, selected, -1)}`}><ArrowLeft className="h-4 w-4" /></Link></Button>
+        <div className={`grid items-center gap-2 ${view === "range" ? "grid-cols-1" : "grid-cols-[40px_1fr_40px]"}`}>
+          {view !== "range" && <Button asChild variant="outline" size="icon"><Link aria-label="Previous period" href={`/dashboard/records?view=${view}&date=${moveSelection(view, selected, -1)}`}><ArrowLeft className="h-4 w-4" /></Link></Button>}
           <p className="min-w-0 text-center text-sm font-semibold">{title}</p>
-          <Button asChild variant="outline" size="icon"><Link aria-label="Next period" href={`/dashboard/records?view=${view}&date=${moveSelection(view, selected, 1)}`}><ArrowRight className="h-4 w-4" /></Link></Button>
+          {view !== "range" && <Button asChild variant="outline" size="icon"><Link aria-label="Next period" href={`/dashboard/records?view=${view}&date=${moveSelection(view, selected, 1)}`}><ArrowRight className="h-4 w-4" /></Link></Button>}
         </div>
       </section>
+
+      <form className="grid gap-3 rounded-lg border bg-card p-4 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
+        <input type="hidden" name="view" value="range" />
+        <label className="space-y-2 text-sm font-medium">From date<Input type="date" name="from" defaultValue={from} required /></label>
+        <label className="space-y-2 text-sm font-medium">To date<Input type="date" name="to" defaultValue={to} required /></label>
+        <Button>Filter records</Button>
+        <Button asChild variant="outline"><Link href="/dashboard/records">Clear</Link></Button>
+      </form>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <RecordStat label="Completion rate" value={`${completionRate}%`} icon={BarChart3} color="text-primary" />
@@ -132,8 +158,8 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
                       <div className="min-w-0">
                         <p className="truncate font-semibold">{record.reminders?.title ?? "Deleted task"}</p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {formatInTimeZone(record.due_at, timezone, "h:mm a")} · {record.reminders?.category ?? "task"}
-                          {record.reminders?.recurrence_type !== "none" ? " · recurring" : ""}
+                          {formatInTimeZone(record.due_at, timezone, "h:mm a")} / {record.reminders?.category ?? "task"}
+                          {record.reminders?.recurrence_type !== "none" ? " / recurring" : ""}
                         </p>
                       </div>
                       <Badge className={statusStyle(status)}>{status}</Badge>

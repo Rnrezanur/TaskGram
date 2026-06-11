@@ -2,11 +2,12 @@ export type DisplayTaskStatus = "completed" | "incomplete" | "pending" | "cancel
 
 type RecordStatusInput = {
   due_at: string;
-  status: "pending" | "completed" | "cancelled";
+  status: "pending" | "completed" | "incomplete" | "cancelled";
 };
 
 export function taskRecordStatus(record: RecordStatusInput, now: number): DisplayTaskStatus {
   if (record.status === "completed") return "completed";
+  if (record.status === "incomplete") return "incomplete";
   if (record.status === "cancelled") return "cancelled";
   return new Date(record.due_at).getTime() < now ? "incomplete" : "pending";
 }

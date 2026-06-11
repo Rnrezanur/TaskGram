@@ -4,18 +4,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Archive, Check, Pencil, Trash2 } from "lucide-react";
+import { Archive, Check, CircleX, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { archiveReminderAction, completeReminderAction, deleteReminderAction } from "@/lib/actions/reminders";
+import { archiveReminderAction, completeReminderAction, deleteReminderAction, markReminderIncompleteAction } from "@/lib/actions/reminders";
 import type { ReminderStatus } from "@/lib/types";
 
 export function ReminderActions({ reminderId, status }: { reminderId: string; status: ReminderStatus }) {
   const router = useRouter();
-  const [pendingAction, setPendingAction] = useState<"complete" | "archive" | "delete" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"complete" | "incomplete" | "archive" | "delete" | null>(null);
   const [localStatus, setLocalStatus] = useState(status);
   const [, startTransition] = useTransition();
 
-  function runAction(actionName: "complete" | "archive" | "delete", action: () => Promise<void>) {
+  function runAction(actionName: "complete" | "incomplete" | "archive" | "delete", action: () => Promise<void>) {
     const previousStatus = localStatus;
     setPendingAction(actionName);
     if (actionName === "complete") setLocalStatus("completed");
@@ -23,7 +23,7 @@ export function ReminderActions({ reminderId, status }: { reminderId: string; st
     startTransition(async () => {
       try {
         await action();
-        toast.success(actionName === "complete" ? "Reminder completed." : actionName === "archive" ? "Reminder archived." : "Reminder deleted.");
+        toast.success(actionName === "complete" ? "Reminder completed." : actionName === "incomplete" ? "Task marked incomplete." : actionName === "archive" ? "Reminder archived." : "Reminder deleted.");
         if (actionName === "delete") {
           router.push("/dashboard/reminders");
         } else {
@@ -55,6 +55,18 @@ export function ReminderActions({ reminderId, status }: { reminderId: string; st
         >
           <Check className="h-4 w-4" />
           {pendingAction === "complete" ? "Completing..." : "Complete"}
+        </Button>
+      )}
+      {localStatus === "active" && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full border-red-300 text-red-700 hover:bg-red-500/10 sm:w-auto dark:text-red-300"
+          disabled={pendingAction !== null}
+          onClick={() => runAction("incomplete", () => markReminderIncompleteAction(reminderId))}
+        >
+          <CircleX className="h-4 w-4" />
+          {pendingAction === "incomplete" ? "Saving..." : "Incomplete"}
         </Button>
       )}
       <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">

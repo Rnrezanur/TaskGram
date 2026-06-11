@@ -12,7 +12,7 @@ const mutationSchema = z.union([
   z.object({
     resource: z.literal("task"),
     id: z.string().uuid(),
-    action: z.enum(["complete", "snooze", "archive", "delete"]),
+    action: z.enum(["complete", "incomplete", "snooze", "archive", "delete"]),
     minutes: z.coerce.number().int().min(1).max(10080).optional()
   }),
   z.object({
@@ -125,16 +125,17 @@ export async function POST(request: NextRequest) {
         .maybeSingle<Reminder>();
       if (!reminder) return responseError(new Error("Task not found."), 404);
 
-      if (data.action === "complete") {
+      if (data.action === "complete" || data.action === "incomplete") {
+        const occurrenceStatus = data.action === "complete" ? "completed" : "incomplete";
         await supabase
           .from("task_occurrences")
-          .update({ status: "completed", completed_at: new Date().toISOString() })
+          .update({ status: occurrenceStatus, completed_at: data.action === "complete" ? new Date().toISOString() : null })
           .eq("reminder_id", data.id)
           .eq("user_id", userId)
           .eq("due_at", reminder.due_at);
         if (reminder.recurrence_type === "none") {
           await Promise.all([
-            supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", userId),
+            supabase.from("reminders").update(data.action === "complete" ? { status: "completed", completed_at: new Date().toISOString() } : { status: "cancelled" }).eq("id", data.id).eq("user_id", userId),
             supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", data.id).eq("delivery_status", "pending")
           ]);
         } else {
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
             await supabase.from("reminders").update({ due_at: next.dueAt.toISOString(), next_occurrence_at: next.dueAt.toISOString() }).eq("id", data.id).eq("user_id", userId);
             await supabase.from("notification_deliveries").insert({ reminder_id: data.id, user_id: userId, scheduled_for: next.scheduledFor.toISOString(), delivery_status: "pending" });
           } else {
-            await supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", data.id).eq("user_id", userId);
+            await supabase.from("reminders").update(data.action === "complete" ? { status: "completed", completed_at: new Date().toISOString() } : { status: "cancelled" }).eq("id", data.id).eq("user_id", userId);
           }
         }
       } else if (data.action === "snooze") {

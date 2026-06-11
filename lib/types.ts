@@ -4,7 +4,7 @@ export type Priority = "low" | "medium" | "high";
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "custom_days" | "custom_weeks";
 export type NoteColor = "default" | "blue" | "green" | "amber" | "rose";
 export type TransactionType = "income" | "expense";
-export type TaskOccurrenceStatus = "pending" | "completed" | "cancelled";
+export type TaskOccurrenceStatus = "pending" | "completed" | "incomplete" | "cancelled";
 
 export type Profile = {
   id: string;

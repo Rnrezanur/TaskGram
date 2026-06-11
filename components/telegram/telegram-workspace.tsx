@@ -5,6 +5,7 @@ import {
   Archive,
   BarChart3,
   Check,
+  CircleX,
   CircleDollarSign,
   Clock3,
   ListTodo,
@@ -55,7 +56,7 @@ type TaskRecord = {
   id: string;
   reminder_id: string;
   due_at: string;
-  status: "pending" | "completed" | "cancelled";
+  status: "pending" | "completed" | "incomplete" | "cancelled";
   reminders: { title: string; category: string } | null;
 };
 type WorkspaceData = {
@@ -189,7 +190,7 @@ export function TelegramWorkspace() {
   ) ?? { income: 0, expense: 0 }, [data]);
   const recordTotals = useMemo(() => data?.records.reduce((sum, record) => {
     if (record.status === "cancelled") return sum;
-    const status = record.status === "completed" ? "completed" : new Date(record.due_at).getTime() < new Date(data.generatedAt).getTime() ? "incomplete" : "pending";
+    const status = record.status === "completed" ? "completed" : record.status === "incomplete" || new Date(record.due_at).getTime() < new Date(data.generatedAt).getTime() ? "incomplete" : "pending";
     sum[status] += 1;
     return sum;
   }, { completed: 0, incomplete: 0, pending: 0 }) ?? { completed: 0, incomplete: 0, pending: 0 }, [data]);
@@ -249,8 +250,9 @@ export function TelegramWorkspace() {
                 <span className={cn("rounded-full px-2 py-1 text-xs font-medium", task.priority === "high" ? "bg-red-500/15 text-red-600" : task.priority === "low" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600")}>{task.priority}</span>
               </div>
               {task.description && <p className="line-clamp-2 text-sm text-muted-foreground">{task.description}</p>}
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <ActionButton label="Complete" icon={Check} onClick={() => mutate(task.id, { resource: "task", id: task.id, action: "complete" })} disabled={busy === task.id} />
+                <ActionButton label="Incomplete" icon={CircleX} destructive onClick={() => mutate(task.id, { resource: "task", id: task.id, action: "incomplete" })} disabled={busy === task.id} />
                 <ActionButton label="Snooze" icon={Clock3} onClick={() => mutate(task.id, { resource: "task", id: task.id, action: "snooze", minutes: 10 })} disabled={busy === task.id} />
                 <ActionButton label="Archive" icon={Archive} onClick={() => mutate(task.id, { resource: "task", id: task.id, action: "archive" })} disabled={busy === task.id} />
                 <ActionButton label="Delete" icon={Trash2} destructive onClick={() => confirm("Delete this task?") && mutate(task.id, { resource: "task", id: task.id, action: "delete" })} disabled={busy === task.id} />
@@ -321,7 +323,7 @@ export function TelegramWorkspace() {
           </div>
           <p className="text-xs font-medium uppercase text-muted-foreground">This month</p>
           {data?.records.filter((record) => record.status !== "cancelled").length ? data.records.filter((record) => record.status !== "cancelled").map((record) => {
-            const status = record.status === "completed" ? "completed" : new Date(record.due_at).getTime() < new Date(data.generatedAt).getTime() ? "incomplete" : "pending";
+            const status = record.status === "completed" ? "completed" : record.status === "incomplete" || new Date(record.due_at).getTime() < new Date(data.generatedAt).getTime() ? "incomplete" : "pending";
             return (
               <Card key={record.id}><CardContent className="flex items-center gap-3 p-4">
                 <div className={cn("h-2.5 w-2.5 shrink-0 rounded-full", status === "completed" ? "bg-emerald-500" : status === "incomplete" ? "bg-red-500" : "bg-sky-500")} />

@@ -79,10 +79,11 @@ export async function POST(request: NextRequest) {
         await answerCallback(update.callback_query.id, "Telegram is not connected to TaskGram.");
         return NextResponse.json({ ok: true });
       }
-      if (action === "complete" || action === "complete_delivery") {
+      if (action === "complete" || action === "complete_delivery" || action === "incomplete" || action === "incomplete_delivery") {
+        const isIncomplete = action.startsWith("incomplete");
         let reminderId = targetId;
         let occurrenceDueAt: string | null = null;
-        if (action === "complete_delivery") {
+        if (action.endsWith("_delivery")) {
           const { data: delivery } = await supabase
             .from("notification_deliveries")
             .select("reminder_id,scheduled_for")
@@ -98,8 +99,8 @@ export async function POST(request: NextRequest) {
           occurrenceDueAt = new Date(new Date(delivery.scheduled_for).getTime() + (reminderTiming?.reminder_minutes_before ?? 0) * 60_000).toISOString();
         }
         const { data: reminder } = await supabase.from("reminders").select("status,recurrence_type,due_at").eq("id", reminderId).eq("user_id", connection.user_id).maybeSingle();
-        if (!reminder || reminder.status === "completed") {
-          await answerCallback(update.callback_query.id, "This reminder is already completed or unavailable.");
+        if (!reminder || reminder.status !== "active") {
+          await answerCallback(update.callback_query.id, "This reminder is already resolved or unavailable.");
           return NextResponse.json({ ok: true });
         }
         let occurrenceQuery = supabase
@@ -112,16 +113,21 @@ export async function POST(request: NextRequest) {
           ? occurrenceQuery.eq("due_at", occurrenceDueAt)
           : occurrenceQuery.lte("due_at", new Date().toISOString()).order("due_at", { ascending: false }).limit(1);
         const { data: occurrence } = await occurrenceQuery.maybeSingle();
-        if (occurrence) {
-          await supabase.from("task_occurrences").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", occurrence.id).eq("user_id", connection.user_id);
+        if (!occurrence) {
+          await answerCallback(update.callback_query.id, "This task occurrence is already resolved.");
+          return NextResponse.json({ ok: true });
         }
+        await supabase.from("task_occurrences").update({
+          status: isIncomplete ? "incomplete" : "completed",
+          completed_at: isIncomplete ? null : new Date().toISOString()
+        }).eq("id", occurrence.id).eq("user_id", connection.user_id);
         if (reminder.recurrence_type === "none") {
-          await supabase.from("reminders").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", reminderId).eq("user_id", connection.user_id);
+          await supabase.from("reminders").update(isIncomplete ? { status: "cancelled" } : { status: "completed", completed_at: new Date().toISOString() }).eq("id", reminderId).eq("user_id", connection.user_id);
           await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", reminderId).eq("delivery_status", "pending");
         }
-        await answerCallback(update.callback_query.id, "Marked complete.");
+        await answerCallback(update.callback_query.id, isIncomplete ? "Marked incomplete." : "Marked complete.");
         if (update.callback_query.message?.message_id) {
-          await editTelegramMessage(chatId, update.callback_query.message.message_id, `${update.callback_query.message.text ?? "TaskGram reminder"}\n\nCompleted in TaskGram.`);
+          await editTelegramMessage(chatId, update.callback_query.message.message_id, `${update.callback_query.message.text ?? "TaskGram reminder"}\n\n${isIncomplete ? "Marked incomplete" : "Completed"} in TaskGram.`);
         }
       }
       if (action === "snooze10") {

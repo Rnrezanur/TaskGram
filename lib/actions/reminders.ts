@@ -146,6 +146,39 @@ export async function completeReminderAction(id: string) {
   revalidatePath(`/dashboard/reminders/${id}`);
 }
 
+export async function markReminderIncompleteAction(id: string) {
+  const { supabase, user } = await requireUser();
+  const { data } = await supabase
+    .from("reminders")
+    .select("id,user_id,due_at,reminder_minutes_before,recurrence_type,recurrence_interval,recurrence_end_at")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single<Reminder>();
+  if (!data) return;
+
+  await supabase
+    .from("task_occurrences")
+    .update({ status: "incomplete", completed_at: null })
+    .eq("reminder_id", id)
+    .eq("user_id", user.id)
+    .eq("due_at", data.due_at);
+
+  await supabase.from("notification_deliveries").update({ delivery_status: "cancelled" }).eq("reminder_id", id).eq("delivery_status", "pending");
+  if (data.recurrence_type === "none") {
+    await supabase.from("reminders").update({ status: "cancelled" }).eq("id", id).eq("user_id", user.id);
+  } else {
+    const next = nextRecurringDelivery(data);
+    if (next) {
+      await supabase.from("reminders").update({ due_at: next.dueAt.toISOString(), next_occurrence_at: next.dueAt.toISOString() }).eq("id", id).eq("user_id", user.id);
+      await supabase.from("notification_deliveries").insert({ reminder_id: id, user_id: user.id, scheduled_for: next.scheduledFor.toISOString(), delivery_status: "pending" });
+    }
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/reminders");
+  revalidatePath("/dashboard/records");
+  revalidatePath(`/dashboard/reminders/${id}`);
+}
+
 export async function archiveReminderAction(id: string) {
   const { supabase, user } = await requireUser();
   await supabase.from("reminders").update({ status: "archived", archived_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id);

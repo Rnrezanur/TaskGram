@@ -7,6 +7,7 @@ describe("task records", () => {
   it("classifies occurrence state without changing stored history", () => {
     expect(taskRecordStatus({ status: "completed", due_at: "2026-06-10T12:00:00.000Z" }, now)).toBe("completed");
     expect(taskRecordStatus({ status: "pending", due_at: "2026-06-10T12:00:00.000Z" }, now)).toBe("incomplete");
+    expect(taskRecordStatus({ status: "incomplete", due_at: "2026-06-12T12:00:00.000Z" }, now)).toBe("incomplete");
     expect(taskRecordStatus({ status: "pending", due_at: "2026-06-12T12:00:00.000Z" }, now)).toBe("pending");
     expect(taskRecordStatus({ status: "cancelled", due_at: "2026-06-10T12:00:00.000Z" }, now)).toBe("cancelled");
   });
@@ -15,8 +16,9 @@ describe("task records", () => {
     expect(taskRecordSummary([
       { status: "completed", due_at: "2026-06-10T12:00:00.000Z" },
       { status: "pending", due_at: "2026-06-10T12:00:00.000Z" },
+      { status: "incomplete", due_at: "2026-06-12T12:00:00.000Z" },
       { status: "pending", due_at: "2026-06-12T12:00:00.000Z" },
       { status: "cancelled", due_at: "2026-06-10T12:00:00.000Z" }
-    ], now)).toEqual({ completed: 1, incomplete: 1, pending: 1 });
+    ], now)).toEqual({ completed: 1, incomplete: 2, pending: 1 });
   });
 });

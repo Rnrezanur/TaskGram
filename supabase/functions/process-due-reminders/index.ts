@@ -79,6 +79,8 @@ Deno.serve(async (req) => {
           reply_markup: {
             inline_keyboard: [[
               { text: "Mark Complete", callback_data: `complete_delivery:${delivery.id}` },
+              { text: "Mark Incomplete", callback_data: `incomplete_delivery:${delivery.id}` }
+            ], [
               { text: "Snooze 10 Minutes", callback_data: `snooze10:${reminder.id}` }
             ], [{ text: "Open Website", url: Deno.env.get("NEXT_PUBLIC_APP_URL") || "https://taskgram.app" }]]
           }
