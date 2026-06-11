@@ -16,6 +16,7 @@ The project demonstrates full-stack product engineering across authentication, a
 
 - Full task lifecycle: create, edit, complete, archive, delete, snooze, search, and filter
 - Daily, monthly, single-date, and custom-range task records with completed, incomplete, pending, and completion-rate insights
+- Exact completion timestamps in task records, reminder details, and the Telegram workspace
 - Searchable personal notes with pinning, colors, editing, and archiving
 - Daily income and expense tracking with monthly summaries and category breakdowns
 - One-time and recurring reminders with timezone-aware scheduling

@@ -161,6 +161,11 @@ export default async function RecordsPage({ searchParams }: { searchParams: Prom
                           {formatInTimeZone(record.due_at, timezone, "h:mm a")} / {record.reminders?.category ?? "task"}
                           {record.reminders?.recurrence_type !== "none" ? " / recurring" : ""}
                         </p>
+                        {status === "completed" && record.completed_at && (
+                          <p className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                            Completed at {formatInTimeZone(record.completed_at, timezone, "d MMM yyyy, h:mm a")}
+                          </p>
+                        )}
                       </div>
                       <Badge className={statusStyle(status)}>{status}</Badge>
                     </Link>

@@ -57,6 +57,7 @@ type TaskRecord = {
   reminder_id: string;
   due_at: string;
   status: "pending" | "completed" | "incomplete" | "cancelled";
+  completed_at: string | null;
   reminders: { title: string; category: string } | null;
 };
 type WorkspaceData = {
@@ -327,7 +328,11 @@ export function TelegramWorkspace() {
             return (
               <Card key={record.id}><CardContent className="flex items-center gap-3 p-4">
                 <div className={cn("h-2.5 w-2.5 shrink-0 rounded-full", status === "completed" ? "bg-emerald-500" : status === "incomplete" ? "bg-red-500" : "bg-sky-500")} />
-                <div className="min-w-0 flex-1"><p className="truncate font-medium">{record.reminders?.title ?? "Task"}</p><p className="text-xs text-muted-foreground">{new Date(record.due_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p></div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{record.reminders?.title ?? "Task"}</p>
+                  <p className="text-xs text-muted-foreground">Due {new Date(record.due_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p>
+                  {status === "completed" && record.completed_at && <p className="mt-1 text-xs font-medium text-emerald-600">Completed {new Date(record.completed_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</p>}
+                </div>
                 <span className="text-xs font-medium capitalize text-muted-foreground">{status}</span>
               </CardContent></Card>
             );

@@ -31,6 +31,7 @@ export function ReminderCard({ reminder }: { reminder: Reminder }) {
           </div>
         </div>
         {reminder.description && <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{reminder.description}</p>}
+        {isCompleted && reminder.completed_at && <p className="mt-3 text-xs font-medium text-emerald-700 dark:text-emerald-300">Completed {shortDate(reminder.completed_at, reminder.timezone)}</p>}
         <ReminderActions reminderId={reminder.id} status={reminder.status} />
       </CardContent>
     </Card>
