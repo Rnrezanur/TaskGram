@@ -22,6 +22,20 @@ type Reminder = {
   recurrence_end_at: string | null;
 };
 
+const MAX_ATTEMPTS = 12;
+
+function retryDelayMinutes(attemptCount: number) {
+  return Math.min(360, 2 ** Math.max(0, attemptCount - 1));
+}
+
+function isPermanentTelegramError(error: unknown) {
+  const message = String(error).toLowerCase();
+  return message.includes("bot was blocked")
+    || message.includes("chat not found")
+    || message.includes("user is deactivated")
+    || message.includes("bot can't initiate conversation");
+}
+
 function addOccurrence(date: Date, type: string, interval = 1) {
   const next = new Date(date);
   if (type === "daily") next.setUTCDate(next.getUTCDate() + 1);
@@ -88,7 +102,13 @@ Deno.serve(async (req) => {
       });
       const payload = await response.json();
       if (!response.ok || !payload.ok) throw new Error(payload.description || "Telegram send failed");
-      await supabase.from("notification_deliveries").update({ delivery_status: "sent", sent_at: new Date().toISOString(), telegram_message_id: payload.result.message_id, error_message: null }).eq("id", delivery.id);
+      await supabase.from("notification_deliveries").update({
+        delivery_status: "sent",
+        sent_at: new Date().toISOString(),
+        telegram_message_id: payload.result.message_id,
+        error_message: null,
+        next_attempt_at: null
+      }).eq("id", delivery.id);
       const next = addOccurrence(new Date(reminder.due_at), reminder.recurrence_type, reminder.recurrence_interval ?? 1);
       if (next && (!reminder.recurrence_end_at || next <= new Date(reminder.recurrence_end_at))) {
         await supabase.from("reminders").update({ due_at: next.toISOString(), next_occurrence_at: next.toISOString() }).eq("id", reminder.id);
@@ -96,13 +116,17 @@ Deno.serve(async (req) => {
       }
       results.push({ id: delivery.id, status: "sent" });
     } catch (error) {
-      const permanent = String(error).includes("blocked") || String(error).includes("chat not found");
+      const permanent = isPermanentTelegramError(error);
+      const exhausted = delivery.attempt_count >= MAX_ATTEMPTS;
       if (permanent) await supabase.from("telegram_connections").update({ is_active: false, disconnected_at: new Date().toISOString() }).eq("user_id", delivery.user_id);
       await supabase.from("notification_deliveries").update({
-        delivery_status: delivery.attempt_count >= 3 || permanent ? "failed" : "pending",
-        error_message: error instanceof Error ? error.message : "Unknown Telegram error"
+        delivery_status: exhausted || permanent ? "failed" : "pending",
+        error_message: error instanceof Error ? error.message : "Unknown Telegram error",
+        next_attempt_at: exhausted || permanent
+          ? null
+          : new Date(Date.now() + retryDelayMinutes(delivery.attempt_count) * 60_000).toISOString()
       }).eq("id", delivery.id);
-      results.push({ id: delivery.id, status: "failed" });
+      results.push({ id: delivery.id, status: exhausted || permanent ? "failed" : "retry_scheduled" });
     }
   }
   return Response.json({ ok: true, processed: results.length, results });
